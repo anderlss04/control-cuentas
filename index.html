@@ -158,6 +158,44 @@
   .disc-day:hover{border-color:var(--accent)}
   .disc-hint{font-size:.8rem;color:var(--muted);background:var(--panel2);border-radius:8px;padding:9px 11px;display:none}
 
+  /* ---- Estadísticas ---- */
+  .stats-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+  .stats-toolbar select{background:var(--bg);border:1px solid var(--border);color:var(--txt);border-radius:8px;padding:8px 11px;font-family:inherit;font-size:.86rem}
+  .stats-note{font-size:.74rem;color:var(--muted2)}
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:10px;margin-bottom:16px}
+  .kpi{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:11px 13px}
+  .kpi-l{font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  .kpi-v{font-size:1.25rem;font-weight:700;margin-top:3px}
+  .kpi-v.g{color:var(--green)} .kpi-v.r{color:var(--red)} .kpi-v.y{color:var(--yellow)}
+  .kpi-h{font-size:.64rem;color:var(--muted2);margin-top:2px}
+  .chart-card{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px}
+  .chart-title{font-size:.8rem;font-weight:700;color:var(--muted);margin-bottom:10px}
+  .chart-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:620px){.chart-row{grid-template-columns:1fr}}
+  .chart-empty{color:var(--muted2);font-size:.82rem;padding:18px;text-align:center}
+  .wd-bars{display:flex;gap:8px;align-items:flex-end;height:120px}
+  .wd-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end}
+  .wd-bar-wrap{flex:1;display:flex;align-items:flex-end;width:100%;justify-content:center}
+  .wd-bar{width:62%;border-radius:4px 4px 0 0;min-height:2px}
+  .wd-bar.pos{background:var(--green)} .wd-bar.neg{background:var(--red)}
+  .wd-lbl{font-size:.68rem;color:var(--muted)}
+  .wd-val{font-size:.63rem;font-weight:700}
+  .wd-val.g{color:var(--green)} .wd-val.r{color:var(--red)}
+  .ext-list{display:flex;flex-direction:column;gap:4px}
+  .ext-row{display:flex;justify-content:space-between;font-size:.8rem;padding:3px 0;border-bottom:1px solid var(--border)}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+  .cal-h{font-size:.66rem;color:var(--muted2);text-align:center;font-weight:700;padding-bottom:2px}
+  .cal-cell{min-height:48px;border-radius:7px;border:1px solid var(--border);background:var(--panel);font-size:.7rem;color:var(--muted);padding:4px 5px;display:flex;flex-direction:column;justify-content:space-between}
+  .cal-cell.empty{border:none;background:transparent}
+  .cal-cell.g{background:rgba(63,185,80,.18);border-color:#1f5128;color:var(--txt)}
+  .cal-cell.r{background:rgba(248,81,73,.18);border-color:#5a2226;color:var(--txt)}
+  .cal-cell.z{background:var(--panel2)}
+  .cal-cell.today{outline:2px solid var(--accent)}
+  .cal-pnl{font-size:.6rem;font-weight:700;align-self:flex-end}
+  .legend{font-size:.74rem;color:var(--muted);line-height:1.8;background:var(--panel2);border-radius:8px;padding:11px 13px}
+  .legend b{color:var(--txt)}
+  .spark{margin:6px 0 -2px}
+
   /* ---- Actualización diaria ---- */
   .mode-tabs{display:flex;gap:6px}
   .mode-tabs button{flex:1;padding:9px 8px;background:var(--bg);border:1px solid var(--border);color:var(--muted);border-radius:8px;font-size:.8rem;font-weight:600}
@@ -215,6 +253,7 @@
   </h1>
   <div class="toolbar">
     <button class="btn btn-primary" onclick="openModal()">＋ Añadir cuenta</button>
+    <button class="btn" onclick="openStats()">📊 Estadísticas</button>
     <button class="btn" onclick="openDisc()">📝 Disciplina hoy</button>
     <button class="btn btn-ghost btn-sm" onclick="exportData()">⭳ Exportar</button>
     <button class="btn btn-ghost btn-sm" onclick="document.getElementById('importFile').click()">⭱ Importar</button>
@@ -481,6 +520,38 @@
       <span style="flex:1"></span>
       <button class="btn" onclick="closeDay()">Cancelar</button>
       <button class="btn btn-primary" onclick="saveDay()">Guardar día</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Estadísticas -->
+<div class="overlay" id="statsOverlay">
+  <div class="modal" style="max-width:920px">
+    <div class="modal-head">
+      <h2>📊 Estadísticas y rendimiento</h2>
+      <button class="close-x" onclick="closeStats()">×</button>
+    </div>
+    <div class="modal-body" style="display:block">
+      <div class="stats-toolbar">
+        <select id="stats-acct" onchange="renderStatsPanel()"></select>
+        <span style="flex:1"></span>
+        <span class="stats-note">Calculado de tus registros diarios (📈 Actualizar día)</span>
+      </div>
+      <div id="statsKpis" class="kpi-grid"></div>
+      <div class="chart-card"><div class="chart-title">📈 Curva de equity (P&amp;L acumulado)</div><div id="statsEquity"></div></div>
+      <div class="chart-row">
+        <div class="chart-card"><div class="chart-title">📅 P&amp;L por día de la semana</div><div id="statsWeekday"></div></div>
+        <div class="chart-card"><div class="chart-title">🏅 Mejores y peores días</div><div id="statsExtremes"></div></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>🗓️ Calendario <span id="calLabel" style="color:var(--txt)"></span></span>
+          <span><button class="btn btn-sm" onclick="calMove(-1)">‹</button> <button class="btn btn-sm" onclick="calMove(1)">›</button></span>
+        </div>
+        <div id="statsCalendar"></div>
+      </div>
+      <div class="chart-title">📖 ¿Qué significa cada métrica?</div>
+      <div class="legend" id="statsLegend"></div>
     </div>
   </div>
 </div>
@@ -874,6 +945,8 @@ function card(a){
       <div class="baln">${a.startBal!==""&&a.startBal!=null?`inicio ${money(a.startBal)}`:""}<br>${a.curBal!==""&&a.curBal!=null?`actual ${money(a.curBal)}`:""}</div>
     </div>
 
+    ${sparkFor(a)}
+
     ${(targetBar||minBar)?`<div class="kv">${targetBar}${minBar}</div>`:""}
 
     ${inactBox}
@@ -1074,7 +1147,8 @@ function toast(msg){
 document.getElementById('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay') closeModal(); });
 document.getElementById('discOverlay').addEventListener('click',e=>{ if(e.target.id==='discOverlay') closeDisc(); });
 document.getElementById('dayOverlay').addEventListener('click',e=>{ if(e.target.id==='dayOverlay') closeDay(); });
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeModal(); closeDisc(); closeDay(); } });
+document.getElementById('statsOverlay').addEventListener('click',e=>{ if(e.target.id==='statsOverlay') closeStats(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeModal(); closeDisc(); closeDay(); closeStats(); } });
 
 /* ============================================================
    DIARIO DE DISCIPLINA (anti-overtrading)
@@ -1264,6 +1338,149 @@ async function deleteDay(){
   try{ await discDelete(id); }catch(e){ toast("⚠️ "+e.message); return; }
   discipline=discipline.filter(x=>x.id!==id);
   closeDay(); render(); toast("🗑 Registro del día borrado");
+}
+
+/* ============================================================
+   ESTADÍSTICAS / ANALÍTICA (todo derivado de los registros diarios)
+   ============================================================ */
+let statsMonth = null;
+
+function dailyPnlSeries(accountId){
+  const map={};
+  discipline.forEach(e=>{
+    if(e.pnl==null) return;
+    if(accountId && e.accountId!==accountId) return;
+    map[e.date]=(map[e.date]||0)+Number(e.pnl);
+  });
+  return Object.keys(map).sort().map(d=>({date:d,pnl:map[d]}));
+}
+function filteredDayStatus(accountId,date){
+  const es=discipline.filter(e=>e.date===date && (!accountId||e.accountId===accountId));
+  if(!es.length) return 'none';
+  if(es.some(e=>e.followed===false)) return 'bad';
+  if(es.some(e=>e.followed===true)) return 'ok';
+  return 'meh';
+}
+function bestStreakFor(accountId){
+  const dates=[...new Set(discipline.filter(e=>(!accountId||e.accountId===accountId)&&(e.followed===true||e.followed===false)).map(e=>e.date))].sort();
+  if(!dates.length) return 0;
+  let best=0,cur=0; const d=parseD(dates[0]), end=parseD(dates[dates.length-1]);
+  while(d<=end){ if(filteredDayStatus(accountId,ymd(d))==='ok'){ cur++; best=Math.max(best,cur); } else cur=0; d.setDate(d.getDate()+1); }
+  return best;
+}
+function statsFor(accountId){
+  const series=dailyPnlSeries(accountId);
+  const n=series.length;
+  let gp=0,gl=0,wins=0,losses=0,best=-Infinity,worst=Infinity,total=0;
+  series.forEach(s=>{ total+=s.pnl; if(s.pnl>0){gp+=s.pnl;wins++;} else if(s.pnl<0){gl+=-s.pnl;losses++;} best=Math.max(best,s.pnl); worst=Math.min(worst,s.pnl); });
+  const winRate=(wins+losses)?wins/(wins+losses):0;
+  const pf=gl>0?gp/gl:(gp>0?Infinity:0);
+  const avgDay=n?total/n:0;
+  let cum=0,peak=0,maxDD=0; const equity=series.map(s=>{ cum+=s.pnl; peak=Math.max(peak,cum); maxDD=Math.max(maxDD,peak-cum); return {date:s.date,cum}; });
+  const discE=discipline.filter(e=>(!accountId||e.accountId===accountId)&&(e.followed===true||e.followed===false));
+  const inPlan=discE.filter(e=>e.followed===true).length;
+  const discPct=discE.length?inPlan/discE.length:null;
+  const tradeE=discipline.filter(e=>(!accountId||e.accountId===accountId)&&e.trades!=null);
+  const avgTrades=tradeE.length?tradeE.reduce((a,e)=>a+Number(e.trades),0)/tradeE.length:null;
+  const today=parseD(todayStr());
+  const wkStart=new Date(today); wkStart.setDate(today.getDate()-((today.getDay()+6)%7));
+  const moStart=new Date(today.getFullYear(),today.getMonth(),1);
+  const sumSince=(start)=>series.filter(s=>parseD(s.date)>=start).reduce((a,s)=>a+s.pnl,0);
+  return { n,total,winRate,pf,avgDay, best:best===-Infinity?null:best, worst:worst===Infinity?null:worst,
+    equity,maxDD,discPct,totalDays:n, avgTrades, weekPnl:sumSince(wkStart), monthPnl:sumSince(moStart) };
+}
+
+function lineChartSVG(vals,w,h){
+  if(!vals||vals.length<2) return '<div class="chart-empty">Registra al menos 2 días con 📈 Actualizar día para ver el gráfico.</div>';
+  const min=Math.min(...vals,0), max=Math.max(...vals,0), range=(max-min)||1, pad=5;
+  const x=i=>pad+i/(vals.length-1)*(w-2*pad);
+  const y=v=>h-pad-(v-min)/range*(h-2*pad);
+  const pts=vals.map((v,i)=>`${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  const last=vals[vals.length-1], col=last>=0?'var(--green)':'var(--red)';
+  const area=`${x(0).toFixed(1)},${(h-pad).toFixed(1)} ${pts} ${x(vals.length-1).toFixed(1)},${(h-pad).toFixed(1)}`;
+  const zero=(0>=min&&0<=max)?`<line x1="${pad}" y1="${y(0).toFixed(1)}" x2="${w-pad}" y2="${y(0).toFixed(1)}" stroke="#2a3340" stroke-width="1" stroke-dasharray="3 3"/>`:'';
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" preserveAspectRatio="none">${zero}
+    <polygon points="${area}" fill="${last>=0?'rgba(63,185,80,.12)':'rgba(248,81,73,.12)'}" stroke="none"/>
+    <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+}
+function weekdayBarsSVG(series){
+  if(!series.length) return '<div class="chart-empty">Sin datos aún.</div>';
+  const names=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'], sums=[0,0,0,0,0,0,0];
+  series.forEach(s=>{ sums[(parseD(s.date).getDay()+6)%7]+=s.pnl; });
+  const maxAbs=Math.max(1,...sums.map(v=>Math.abs(v)));
+  return `<div class="wd-bars">${sums.map((v,i)=>{ const ht=Math.round(Math.abs(v)/maxAbs*78); const pos=v>=0;
+    return `<div class="wd-col"><div class="wd-bar-wrap"><div class="wd-bar ${pos?'pos':'neg'}" style="height:${ht}px"></div></div><div class="wd-lbl">${names[i]}</div><div class="wd-val ${pos?'g':'r'}">${v?signMoney(v):'—'}</div></div>`; }).join('')}</div>`;
+}
+function extremesHtml(accountId){
+  const ser=[...dailyPnlSeries(accountId)].sort((a,b)=>b.pnl-a.pnl);
+  if(!ser.length) return '<div class="chart-empty">Sin datos aún.</div>';
+  const row=s=>`<div class="ext-row"><span>${fmtDate(s.date)}</span><span style="color:${s.pnl>0?'var(--green)':(s.pnl<0?'var(--red)':'inherit')};font-weight:700">${signMoney(s.pnl)}</span></div>`;
+  const top=ser.slice(0,3).map(row).join(''), bot=ser.slice(-3).reverse().map(row).join('');
+  return `<div class="ext-list"><div style="font-size:.7rem;color:var(--muted)">Mejores</div>${top}<div style="font-size:.7rem;color:var(--muted);margin-top:8px">Peores</div>${bot}</div>`;
+}
+function buildKpis(s){
+  const k=(l,v,c,h)=>`<div class="kpi"><div class="kpi-l">${l}</div><div class="kpi-v ${c||''}">${v}</div>${h?`<div class="kpi-h">${h}</div>`:''}</div>`;
+  const pf=s.pf===Infinity?'∞':s.pf.toFixed(2);
+  return [
+    k('P&L total', s.n?signMoney(s.total):'—', s.total>0?'g':(s.total<0?'r':'')),
+    k('Win rate', s.n?(s.winRate*100).toFixed(0)+'%':'—', s.winRate>=0.5?'g':(s.n?'y':''),'días ganadores'),
+    k('Profit factor', s.n?pf:'—', s.pf>=1?'g':(s.n?'r':''),'ganan ÷ pierden'),
+    k('P&L medio/día', s.n?signMoney(Math.round(s.avgDay)):'—', s.avgDay>0?'g':(s.avgDay<0?'r':'')),
+    k('Mejor día', s.best!=null?signMoney(s.best):'—','g'),
+    k('Peor día', s.worst!=null?signMoney(s.worst):'—','r'),
+    k('Max drawdown', s.n?'−'+money(s.maxDD):'—','r','caída máxima'),
+    k('% Disciplina', s.discPct!=null?(s.discPct*100).toFixed(0)+'%':'—', s.discPct>=0.8?'g':(s.discPct!=null?'y':''),'días en plan'),
+    k('Mejor racha', s.bestStreak?s.bestStreak+'d':'—','y'),
+    k('Días operados', s.totalDays||'—'),
+    k('Esta semana', s.n?signMoney(s.weekPnl):'—', s.weekPnl>0?'g':(s.weekPnl<0?'r':'')),
+    k('Este mes', s.n?signMoney(s.monthPnl):'—', s.monthPnl>0?'g':(s.monthPnl<0?'r':''))
+  ].join('');
+}
+const STATS_LEGEND=`<b>Win rate</b>: % de días con resultado positivo. &nbsp;·&nbsp;
+<b>Profit factor</b>: ganancias totales ÷ pérdidas totales. &gt;1 es rentable; &gt;1.5 es sólido. &nbsp;·&nbsp;
+<b>P&L medio/día</b>: tu esperanza matemática por día (lo que esperas ganar de media). &nbsp;·&nbsp;
+<b>Max drawdown</b>: la mayor caída desde un máximo de tu curva de equity — cuánto llegaste a ceder. &nbsp;·&nbsp;
+<b>% Disciplina</b>: días que seguiste tu plan ÷ días registrados. &nbsp;·&nbsp;
+<b>Mejor racha</b>: tu mayor seguidilla de días siguiendo el plan. La clave no es ganar mucho un día, sino ser consistente.`;
+function renderCalendar(){
+  const acct=document.getElementById('stats-acct').value||null;
+  const map={}; dailyPnlSeries(acct).forEach(s=>map[s.date]=s.pnl);
+  const y=statsMonth.getFullYear(), m=statsMonth.getMonth();
+  document.getElementById('calLabel').textContent=statsMonth.toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+  const startWd=(new Date(y,m,1).getDay()+6)%7, dim=new Date(y,m+1,0).getDate();
+  let cells=['L','M','X','J','V','S','D'].map(n=>`<div class="cal-h">${n}</div>`).join('');
+  for(let i=0;i<startWd;i++) cells+=`<div class="cal-cell empty"></div>`;
+  for(let day=1;day<=dim;day++){
+    const key=y+'-'+String(m+1).padStart(2,'0')+'-'+String(day).padStart(2,'0'); const v=map[key];
+    const cls='cal-cell'+(v!=null?(v>0?' g':(v<0?' r':' z')):'')+(key===todayStr()?' today':'');
+    cells+=`<div class="${cls}"><span>${day}</span>${v!=null?`<span class="cal-pnl">${signMoney(v)}</span>`:''}</div>`;
+  }
+  document.getElementById('statsCalendar').innerHTML=`<div class="cal-grid">${cells}</div>`;
+}
+function calMove(delta){ statsMonth=new Date(statsMonth.getFullYear(),statsMonth.getMonth()+delta,1); renderCalendar(); }
+function renderStatsPanel(){
+  const acct=document.getElementById('stats-acct').value||null;
+  const s=statsFor(acct); s.bestStreak=bestStreakFor(acct);
+  document.getElementById('statsKpis').innerHTML=buildKpis(s);
+  document.getElementById('statsEquity').innerHTML=lineChartSVG(s.equity.map(e=>e.cum),880,170);
+  document.getElementById('statsWeekday').innerHTML=weekdayBarsSVG(dailyPnlSeries(acct));
+  document.getElementById('statsExtremes').innerHTML=extremesHtml(acct);
+  renderCalendar();
+  document.getElementById('statsLegend').innerHTML=STATS_LEGEND;
+}
+function openStats(){
+  if(!hasDiscipline){ toast('⚠️ Ejecuta la migración SQL para activar las estadísticas'); return; }
+  document.getElementById('stats-acct').innerHTML=['<option value="">Todas las cuentas</option>'].concat(accounts.map(a=>`<option value="${a.id}">${esc(a.alias)}</option>`)).join('');
+  const now=new Date(); statsMonth=new Date(now.getFullYear(),now.getMonth(),1);
+  renderStatsPanel();
+  document.getElementById('statsOverlay').classList.add('open');
+}
+function closeStats(){ document.getElementById('statsOverlay').classList.remove('open'); }
+function sparkFor(a){
+  if(!hasDiscipline) return '';
+  const ser=dailyPnlSeries(a.id); if(ser.length<2) return '';
+  let cum=0; const vals=ser.map(s=>cum+=s.pnl);
+  return `<div class="spark">${lineChartSVG(vals,300,40)}</div>`;
 }
 
 /* init */
