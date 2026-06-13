@@ -158,6 +158,19 @@
   .disc-day:hover{border-color:var(--accent)}
   .disc-hint{font-size:.8rem;color:var(--muted);background:var(--panel2);border-radius:8px;padding:9px 11px;display:none}
 
+  /* ---- Meta mensual + coach de gestión ---- */
+  .goal-panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:13px 16px;margin-bottom:14px;display:flex;flex-direction:column;gap:9px}
+  .goal-head{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:.9rem;flex-wrap:wrap}
+  .goal-panel .bar{height:10px}
+  #goalPanel:empty,#coachPanel:empty{display:none}
+  #coachPanel{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+  .coach{border-radius:10px;padding:10px 14px;font-size:.86rem;border:1px solid;line-height:1.45}
+  .coach.danger{background:var(--red-bg);border-color:#5a2226}
+  .coach.warn{background:var(--yellow-bg);border-color:#5c4a14}
+  .coach.good{background:var(--green-bg);border-color:#1f5128}
+  .coach.info{background:var(--panel2);border-color:var(--border)}
+  .coach b{color:var(--txt)}
+
   /* ---- Estadísticas ---- */
   .stats-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
   .stats-toolbar select{background:var(--bg);border:1px solid var(--border);color:var(--txt);border-radius:8px;padding:8px 11px;font-family:inherit;font-size:.86rem}
@@ -264,6 +277,8 @@
 </header>
 
 <div class="stats" id="stats"></div>
+<div id="goalPanel"></div>
+<div id="coachPanel"></div>
 <div class="alerts" id="alerts"></div>
 <div id="discPanel"></div>
 
@@ -637,6 +652,7 @@ let filter = "all";
 let supa = null, currentUser = null, _shownUid = undefined;
 let discipline = [];                              // diario de disciplina
 let hasRiskCols = false, hasDiscipline = false;   // detección de esquema (migración aplicada o no)
+let settings = { monthlyGoal:null }; let hasSettings = false;   // ajustes (meta mensual…)
 
 /* ---------- utilidades de fecha ---------- */
 function todayStr(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
@@ -737,12 +753,15 @@ async function enterApp(){
   document.getElementById('userEmail').textContent=currentUser.email||"conectado";
   buildFirmSelect();
   await detectSchema();
-  await refresh();
+  await loadSettings();
   await loadDiscipline();
+  await refresh();
+  render();
 }
 async function detectSchema(){
   try{ const {error}=await supa.from('accounts').select('max_trades_day').limit(1); hasRiskCols=!error; }catch(e){ hasRiskCols=false; }
   try{ const {error}=await supa.from('discipline_log').select('id').limit(1); hasDiscipline=!error; }catch(e){ hasDiscipline=false; }
+  try{ const {error}=await supa.from('app_settings').select('user_id').limit(1); hasSettings=!error; }catch(e){ hasSettings=false; }
 }
 
 async function doLogin(ev){
@@ -773,17 +792,19 @@ async function refresh(){
   }catch(e){
     toast("⚠️ Error cargando de la nube: "+e.message);
     accounts = loadCache();
-    render(); return;
+    return;
   }
-  if(accounts.length===0) await seedOrMigrate();
-  cache(); render();
+  if(accounts.length===0 && !settings.seeded) await seedOrMigrate();
+  else if(accounts.length>0 && !settings.seeded){ settings.seeded=true; await saveSettings(); }
+  cache();
 }
 async function seedOrMigrate(){
   const local = loadCache().filter(a=>a && a.alias);
   if(local.length){
     if(confirm(`Tienes ${local.length} cuenta(s) guardadas en este navegador. ¿Importarlas a la nube?`)){
-      for(const a of local){ if(!a.id) a.id=genId(); try{ await dbUpsert(a); }catch(e){} }
+      for(const a of local){ if(!a.id || !/^[A-Za-z0-9_]+$/.test(String(a.id))) a.id=genId(); try{ await dbUpsert(a); }catch(e){} }
       try{ accounts = await dbList(); }catch(e){}
+      settings.seeded=true; await saveSettings();
       return;
     }
   }
@@ -798,6 +819,7 @@ async function seedOrMigrate(){
   });
   for(const a of seeds){ try{ await dbUpsert(a); }catch(e){} }
   try{ accounts = await dbList(); }catch(e){ accounts = seeds; }
+  settings.seeded=true; await saveSettings();
 }
 
 /* ---------- cálculos derivados ---------- */
@@ -824,7 +846,7 @@ function setFilter(el,f){
   el.classList.add('active');
   render();
 }
-function render(){ renderStats(); renderAlerts(); renderGrid(); renderDiscipline(); }
+function render(){ renderStats(); renderGoal(); renderCoach(); renderAlerts(); renderGrid(); renderDiscipline(); }
 
 function renderStats(){
   let totalProfit=0, withProfit=0, inRisk=0, totalCost=0;
@@ -965,7 +987,7 @@ function card(a){
       <button class="btn btn-sm" style="background:var(--green-bg);border-color:#1f5128;color:var(--green)" onclick="openDay('${a.id}')">📈 Actualizar día</button>
       <button class="btn btn-sm" onclick="editAccount('${a.id}')">✎ Editar</button>
       ${a.minDays>0?`<button class="btn btn-sm" onclick="resetCycle('${a.id}')" title="Reiniciar contador de días mínimos (nuevo ciclo/payout)">↺ Ciclo</button>`:""}
-      ${a.login?`<button class="btn btn-sm" onclick="window.open('${encodeURI(a.login)}','_blank')">↗ Login</button>`:""}
+      ${/^https?:\/\//i.test(a.login||'')?`<a class="btn btn-sm" href="${esc(a.login)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none">↗ Login</a>`:""}
     </div>
   </div>`;
 }
@@ -973,15 +995,7 @@ function card(a){
 function esc(s){ return (s==null?"":String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 /* ---------- acciones de tarjeta (async, persisten en la nube) ---------- */
-async function markTraded(id){
-  const a=accounts.find(x=>x.id===id); if(!a) return;
-  const t=todayStr();
-  if(a.lastTraded!==t){ a.daysDone=(Number(a.daysDone)||0)+1; }
-  a.lastTraded=t;
-  try{ await dbUpsert(a); }catch(e){ toast("⚠️ No se pudo guardar: "+e.message); return; }
-  cache(); render();
-  toast(`✓ "${a.alias}" marcada como operada hoy (${a.daysDone} día(s) este ciclo)`);
-}
+/* markTraded eliminado: el cierre del día se hace ahora con "📈 Actualizar día" (openDay/saveDay) */
 async function resetCycle(id){
   const a=accounts.find(x=>x.id===id); if(!a) return;
   if(!confirm(`¿Reiniciar el contador de días mínimos de "${a.alias}"? (nuevo ciclo / tras payout)`)) return;
@@ -1129,7 +1143,7 @@ async function importData(ev){
       const data=JSON.parse(e.target.result);
       if(!Array.isArray(data)) throw 0;
       let n=0;
-      for(const d of data){ if(!d||!d.alias) continue; if(!d.id) d.id=genId(); try{ await dbUpsert(d); n++; }catch(err){} }
+      for(const d of data){ if(!d||!d.alias) continue; if(!d.id || !/^[A-Za-z0-9_]+$/.test(String(d.id))) d.id=genId(); try{ await dbUpsert(d); n++; }catch(err){} }
       accounts=await dbList(); cache(); render();
       toast(`⭱ ${n} cuenta(s) importadas a la nube`);
     }catch(err){ toast("⚠️ Archivo no válido"); }
@@ -1284,7 +1298,8 @@ function dayPreview(){
     + `<br>P&L de hoy: <b style="color:${pcol(c.dayPnl)}">${signMoney(c.dayPnl)}</b>`
     + (afterProfit!=null?` &nbsp;·&nbsp; Profit total: <b style="color:${pcol(afterProfit)}">${signMoney(afterProfit)}</b>`:'')
     + (c.prior?` <span style="color:var(--muted2)">(hoy ya tenías ${signMoney(Number(c.prior.pnl)||0)}; escribe solo lo nuevo)</span>`:'')
-    + (warns.length?`<br><span style="color:var(--yellow)">${warns.join('<br>')}</span>`:'');
+    + (warns.length?`<br><span style="color:var(--yellow)">${warns.join('<br>')}</span>`:'')
+    + (!hasDiscipline?`<br><span style="color:var(--muted2)">Se actualizará el balance, pero el registro diario y las estadísticas requieren ejecutar la migración SQL.</span>`:'');
 }
 function openDay(accountId,dateStr){
   const a=accounts.find(x=>x.id===accountId); if(!a) return;
@@ -1309,12 +1324,12 @@ async function saveDay(){
   const trades=numD('day-trades');
   const note=document.getElementById('day-note').value.trim();
   // 1) actualizar la cuenta: balance + actividad + días mínimos
-  const prevLast=a.lastTraded;
+  const prevLast=a.lastTraded, _oldBal=a.curBal, _oldDays=a.daysDone;
   a.curBal=c.newBal;
   if(!a.lastTraded || date>=a.lastTraded) a.lastTraded=date;
-  const firstTimeThisDay = hasDiscipline ? !c.prior : (prevLast!==date);
+  const firstTimeThisDay = hasDiscipline ? !c.prior : (!prevLast || date>prevLast);
   if(firstTimeThisDay) a.daysDone=(Number(a.daysDone)||0)+1;
-  try{ await dbUpsert(a); }catch(e){ toast("⚠️ No se pudo guardar la cuenta: "+e.message); return; }
+  try{ await dbUpsert(a); }catch(e){ a.curBal=_oldBal; a.lastTraded=prevLast; a.daysDone=_oldDays; toast("⚠️ No se guardó (¿sin conexión?): "+e.message); return; }
   const i=accounts.findIndex(x=>x.id===a.id); if(i>=0) accounts[i]=a;
   // 2) registrar el día en el diario de disciplina (si la migración está aplicada)
   if(hasDiscipline){
@@ -1373,7 +1388,7 @@ function statsFor(accountId){
   const n=series.length;
   let gp=0,gl=0,wins=0,losses=0,best=-Infinity,worst=Infinity,total=0;
   series.forEach(s=>{ total+=s.pnl; if(s.pnl>0){gp+=s.pnl;wins++;} else if(s.pnl<0){gl+=-s.pnl;losses++;} best=Math.max(best,s.pnl); worst=Math.min(worst,s.pnl); });
-  const winRate=(wins+losses)?wins/(wins+losses):0;
+  const winRate = n ? wins/n : 0;
   const pf=gl>0?gp/gl:(gp>0?Infinity:0);
   const avgDay=n?total/n:0;
   let cum=0,peak=0,maxDD=0; const equity=series.map(s=>{ cum+=s.pnl; peak=Math.max(peak,cum); maxDD=Math.max(maxDD,peak-cum); return {date:s.date,cum}; });
@@ -1481,6 +1496,73 @@ function sparkFor(a){
   const ser=dailyPnlSeries(a.id); if(ser.length<2) return '';
   let cum=0; const vals=ser.map(s=>cum+=s.pnl);
   return `<div class="spark">${lineChartSVG(vals,300,40)}</div>`;
+}
+
+/* ============================================================
+   META MENSUAL + COACH DE GESTIÓN (alertas accionables)
+   ============================================================ */
+function loadSettingsLocal(){ try{ return JSON.parse(localStorage.getItem('cc_settings'))||{}; }catch(e){ return {}; } }
+function saveSettingsLocal(){ try{ localStorage.setItem('cc_settings', JSON.stringify(settings)); }catch(e){} }
+async function loadSettings(){
+  settings=Object.assign({monthlyGoal:null}, loadSettingsLocal());
+  if(hasSettings){
+    try{ const {data,error}=await supa.from('app_settings').select('data').eq('user_id',currentUser.id).maybeSingle();
+      if(!error && data && data.data) settings=Object.assign(settings,data.data); }catch(e){}
+  }
+}
+async function saveSettings(){
+  saveSettingsLocal();
+  if(hasSettings){ try{ await supa.from('app_settings').upsert({user_id:currentUser.id,data:settings}); }catch(e){} }
+}
+function monthStartD(){ const t=parseD(todayStr()); return new Date(t.getFullYear(),t.getMonth(),1); }
+function monthPnlAll(){ const ms=monthStartD(); return dailyPnlSeries(null).filter(s=>parseD(s.date)>=ms).reduce((a,s)=>a+s.pnl,0); }
+
+function renderGoal(){
+  const el=document.getElementById('goalPanel'); if(!el) return;
+  if(!hasDiscipline){ el.innerHTML=''; return; }
+  const g=settings.monthlyGoal, m=monthPnlAll();
+  if(g==null || !(g>0)){
+    el.innerHTML=`<div class="goal-panel"><div class="goal-head"><div>🎯 <b>Meta mensual</b> — fíjate un objetivo de P&L del mes y vigila tu progreso</div><button class="btn btn-sm btn-primary" onclick="setGoal()">Definir meta</button></div></div>`;
+    return;
+  }
+  const pct=Math.max(0,Math.min(100, g>0? m/g*100 : (m>0?100:0))), reached=m>=g;
+  el.innerHTML=`<div class="goal-panel">
+    <div class="goal-head">
+      <div>🎯 <b>Meta del mes</b>: ${money(g)} · llevas <b style="color:${m>0?'var(--green)':(m<0?'var(--red)':'inherit')}">${signMoney(m)}</b> <span style="color:var(--muted)">(${pct.toFixed(0)}%)</span> ${reached?'🎉':''}</div>
+      <button class="btn btn-sm" onclick="setGoal()" title="Editar meta">✎</button>
+    </div>
+    <div class="bar ${reached?'green':'blue'}"><i style="width:${pct}%"></i></div>
+  </div>`;
+}
+async function setGoal(){
+  const v=prompt('Meta de P&L para este mes ($). Deja vacío para quitarla:', settings.monthlyGoal!=null?settings.monthlyGoal:'');
+  if(v===null) return;
+  const t=String(v).trim();
+  if(t===''){ settings.monthlyGoal=null; }
+  else { const num=Number(t); if(isNaN(num)||num<=0){ toast('⚠️ La meta debe ser un número mayor que 0'); return; } settings.monthlyGoal=num; }
+  await saveSettings(); renderGoal(); renderCoach();
+  toast(settings.monthlyGoal!=null?('🎯 Meta mensual: '+money(settings.monthlyGoal)):'Meta mensual quitada');
+}
+
+function losingStreak(accountId){ const ser=dailyPnlSeries(accountId); let s=0; for(let i=ser.length-1;i>=0;i--){ if(ser[i].pnl<0) s++; else break; } return s; }
+function winStreak(accountId){ const ser=dailyPnlSeries(accountId); let s=0; for(let i=ser.length-1;i>=0;i--){ if(ser[i].pnl>0) s++; else break; } return s; }
+function renderCoach(){
+  const el=document.getElementById('coachPanel'); if(!el) return;
+  if(!hasDiscipline){ el.innerHTML=''; return; }
+  const al=[], today=todayStr();
+  const ls=losingStreak(null);
+  if(ls>=3) al.push({lvl:'danger',txt:`🛑 Llevas <b>${ls} días seguidos en pérdida</b>. Reduce tamaño/riesgo o párate hoy — recuperar a la fuerza hace más daño que la propia pérdida.`});
+  else if(ls===2) al.push({lvl:'warn',txt:`⚠️ 2 sesiones seguidas en pérdida. Opera tu plan, no la revancha.`});
+  accounts.forEach(a=>{ const l=losingStreak(a.id); if(l>=3) al.push({lvl:'warn',txt:`📉 En <b>${esc(a.alias)}</b> llevas ${l} días perdiendo. Revisa el setup o baja el tamaño en esa cuenta.`}); });
+  accounts.forEach(a=>{
+    const e=discipline.find(x=>x.id==='day_'+a.id+'_'+today); if(!e) return;
+    if(a.riskPerDay && e.pnl!=null && e.pnl < -Math.abs(Number(a.riskPerDay))) al.push({lvl:'danger',txt:`🩸 Hoy en <b>${esc(a.alias)}</b> superaste tu riesgo diario (${signMoney(e.pnl)} vs límite ${money(a.riskPerDay)}). Cierra por hoy.`});
+    if(a.maxTradesDay && e.trades!=null && e.trades>Number(a.maxTradesDay)) al.push({lvl:'warn',txt:`🔁 Hoy en <b>${esc(a.alias)}</b> llevas ${e.trades} trades (tu máx: ${a.maxTradesDay}). Para de sobre-operar.`});
+  });
+  const st=discStreak(); if(st>=3) al.push({lvl:'good',txt:`🔥 <b>${st} días siguiendo tu plan</b>. Esto es lo que construye cuentas — sigue igual.`});
+  const ws=winStreak(null); if(ws>=4) al.push({lvl:'good',txt:`🟢 ${ws} días ganando seguidos. Buen momento, pero NO subas el riesgo de golpe; mantén tu tamaño y tu plan.`});
+  if(settings.monthlyGoal!=null && settings.monthlyGoal>0){ const m=monthPnlAll(); if(m>=settings.monthlyGoal) al.push({lvl:'good',txt:`🎉 ¡Meta mensual alcanzada! (${signMoney(m)} de ${money(settings.monthlyGoal)}). Plantéate proteger lo ganado y no forzar de más.`}); }
+  el.innerHTML = al.map(a=>`<div class="coach ${a.lvl}">${a.txt}</div>`).join('');
 }
 
 /* init */
