@@ -158,6 +158,13 @@
   .disc-day:hover{border-color:var(--accent)}
   .disc-hint{font-size:.8rem;color:var(--muted);background:var(--panel2);border-radius:8px;padding:9px 11px;display:none}
 
+  /* ---- Actualización diaria ---- */
+  .mode-tabs{display:flex;gap:6px}
+  .mode-tabs button{flex:1;padding:9px 8px;background:var(--bg);border:1px solid var(--border);color:var(--muted);border-radius:8px;font-size:.8rem;font-weight:600}
+  .mode-tabs button.active{background:var(--blue-bg);border-color:var(--blue);color:var(--accent)}
+  .day-preview{font-size:.85rem;color:var(--muted);background:var(--panel2);border-radius:8px;padding:11px 13px;line-height:1.7}
+  .day-preview b{color:var(--txt)}
+
   /* ---- Pantalla de login ---- */
   #authScreen{min-height:78vh;display:flex;align-items:center;justify-content:center;padding:20px}
   .auth-card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:30px 28px;max-width:380px;width:100%;box-shadow:var(--shadow)}
@@ -423,6 +430,57 @@
       <span style="flex:1"></span>
       <button class="btn" onclick="closeDisc()">Cancelar</button>
       <button class="btn btn-primary" onclick="saveDisc()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Actualizar día (por cuenta) -->
+<div class="overlay" id="dayOverlay">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-head">
+      <h2 id="dayTitle">Actualizar día</h2>
+      <button class="close-x" onclick="closeDay()">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="day-acct">
+      <div class="field full">
+        <label>Fecha</label>
+        <input id="day-date" type="date" onchange="dayPreview()">
+      </div>
+      <div class="field full">
+        <label>¿Cómo metes el resultado?</label>
+        <div class="mode-tabs">
+          <button type="button" id="modePnl" class="active" onclick="setDayMode('pnl')">Ganancia/Pérdida (+/−)</button>
+          <button type="button" id="modeBal" onclick="setDayMode('balance')">Balance nuevo</button>
+        </div>
+      </div>
+      <div class="field full">
+        <label id="day-resultLabel">Ganancia / pérdida de hoy ($)</label>
+        <input id="day-result" type="number" step="any" placeholder="+250 ó -180" oninput="dayPreview()">
+      </div>
+      <div class="field">
+        <label>Nº de trades hoy</label>
+        <input id="day-trades" type="number" placeholder="0" oninput="dayPreview()">
+      </div>
+      <div class="field">
+        <label>¿Seguí mi plan?</label>
+        <select id="day-followed">
+          <option value="">—</option>
+          <option value="si">✅ Sí</option>
+          <option value="no">❌ No</option>
+        </select>
+      </div>
+      <div class="field full">
+        <label>Nota <span class="hint">(opcional)</span></label>
+        <input id="day-note" placeholder="Ej: disciplinado, sin revenge">
+      </div>
+      <div class="day-preview full" id="dayPreview"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-danger" id="dayDeleteBtn" onclick="deleteDay()" style="display:none">🗑 Borrar día</button>
+      <span style="flex:1"></span>
+      <button class="btn" onclick="closeDay()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveDay()">Guardar día</button>
     </div>
   </div>
 </div>
@@ -706,9 +764,13 @@ function renderStats(){
     if(a.cost) totalCost+=Number(a.cost);
   });
   const pc = totalProfit>0?"green":(totalProfit<0?"red":"");
+  const tp = dayAgg(todayStr()).pnl;
+  const tpc = tp>0?"green":(tp<0?"red":"");
   document.getElementById('stats').innerHTML = `
     <div class="stat"><div class="label">Cuentas</div><div class="value">${accounts.length}</div>
       <div class="foot">${accounts.filter(a=>a.type==='Funded').length} funded · ${accounts.filter(a=>a.type==='Evaluación').length} eval · ${accounts.filter(a=>a.type==='Capital propio').length} propias</div></div>
+    <div class="stat"><div class="label">P&amp;L de hoy</div><div class="value ${tpc}">${tp!=null?signMoney(tp):"—"}</div>
+      <div class="foot">resultado del día (todas)</div></div>
     <div class="stat"><div class="label">Profit total</div><div class="value ${pc}">${withProfit?signMoney(totalProfit):"—"}</div>
       <div class="foot">${withProfit} cuentas con balance</div></div>
     <div class="stat"><div class="label">En riesgo</div><div class="value ${inRisk?'red':'green'}">${inRisk}</div>
@@ -827,7 +889,7 @@ function card(a){
     ${a.notes?`<div class="notes">${esc(a.notes)}</div>`:""}
 
     <div class="card-actions">
-      <button class="btn btn-sm" style="background:var(--green-bg);border-color:#1f5128;color:var(--green)" onclick="markTraded('${a.id}')">✓ Operé hoy</button>
+      <button class="btn btn-sm" style="background:var(--green-bg);border-color:#1f5128;color:var(--green)" onclick="openDay('${a.id}')">📈 Actualizar día</button>
       <button class="btn btn-sm" onclick="editAccount('${a.id}')">✎ Editar</button>
       ${a.minDays>0?`<button class="btn btn-sm" onclick="resetCycle('${a.id}')" title="Reiniciar contador de días mínimos (nuevo ciclo/payout)">↺ Ciclo</button>`:""}
       ${a.login?`<button class="btn btn-sm" onclick="window.open('${encodeURI(a.login)}','_blank')">↗ Login</button>`:""}
@@ -1011,7 +1073,8 @@ function toast(msg){
 
 document.getElementById('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay') closeModal(); });
 document.getElementById('discOverlay').addEventListener('click',e=>{ if(e.target.id==='discOverlay') closeDisc(); });
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeModal(); closeDisc(); } });
+document.getElementById('dayOverlay').addEventListener('click',e=>{ if(e.target.id==='dayOverlay') closeDay(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeModal(); closeDisc(); closeDay(); } });
 
 /* ============================================================
    DIARIO DE DISCIPLINA (anti-overtrading)
@@ -1028,11 +1091,13 @@ async function loadDiscipline(){
   catch(e){ discipline=[]; }
   renderDiscipline();
 }
-function discByDate(){ const m={}; discipline.forEach(e=>{ if(e.date) m[e.date]=e; }); return m; }
+function dayEntries(date){ return discipline.filter(e=>e.date===date); }
+function dayStatus(date){ const es=dayEntries(date); if(!es.length) return 'none'; if(es.some(e=>e.followed===false)) return 'bad'; if(es.some(e=>e.followed===true)) return 'ok'; return 'meh'; }
+function dayAgg(date){ const es=dayEntries(date); let tr=null,p=null; es.forEach(e=>{ if(e.trades!=null){ tr=(tr||0)+Number(e.trades); } if(e.pnl!=null){ p=(p||0)+Number(e.pnl); } }); return {trades:tr,pnl:p,count:es.length}; }
 function discStreak(){
-  const m=discByDate(); let s=0; const d=parseD(todayStr());
-  if(!m[todayStr()]) d.setDate(d.getDate()-1);
-  while(true){ const e=m[ymd(d)]; if(e && e.followed===true){ s++; d.setDate(d.getDate()-1); } else break; }
+  let s=0; const d=parseD(todayStr());
+  if(dayStatus(todayStr())==='none') d.setDate(d.getDate()-1);
+  while(dayStatus(ymd(d))==='ok'){ s++; d.setDate(d.getDate()-1); }
   return s;
 }
 function renderDiscipline(){
@@ -1041,18 +1106,17 @@ function renderDiscipline(){
     el.innerHTML=`<div class="disc-panel disc-setup">🎯 <b>Diario de disciplina</b> — ejecuta una vez la migración <code>supabase-migration-disciplina.sql</code> en Supabase (SQL Editor → Run) y recarga la página para activarlo.</div>`;
     return;
   }
-  const m=discByDate(), streak=discStreak(), today=todayStr(), todayE=m[today];
+  const streak=discStreak(), today=todayStr(), todayHas=dayStatus(today)!=='none';
   let strip="";
   for(let i=13;i>=0;i--){
-    const d=parseD(today); d.setDate(d.getDate()-i); const key=ymd(d); const e=m[key];
-    const cls= e? (e.followed===true?'ok':(e.followed===false?'bad':'meh')) : 'none';
-    const tip= e? `${key} · ${e.trades!=null?e.trades+' trades':'—'} · ${e.pnl!=null?signMoney(e.pnl):'—'} · ${e.followed===true?'✓ plan':(e.followed===false?'✗ plan':'sin marcar')}` : key+' · sin registro';
-    strip+=`<button class="disc-day ${cls}" title="${esc(tip)}" onclick="openDisc('${key}')">${String(d.getDate()).padStart(2,'0')}</button>`;
+    const d=parseD(today); d.setDate(d.getDate()-i); const key=ymd(d); const st=dayStatus(key); const ag=dayAgg(key);
+    const tip= st==='none' ? key+' · sin registro' : `${key} · ${ag.trades!=null?ag.trades+' trades':'—'} · ${ag.pnl!=null?signMoney(ag.pnl):'—'} · ${st==='ok'?'✓ en plan':(st==='bad'?'✗ roto':'sin marcar')}`;
+    strip+=`<button class="disc-day ${st}" title="${esc(tip)}" onclick="openDisc('${key}')">${String(d.getDate()).padStart(2,'0')}</button>`;
   }
   el.innerHTML=`<div class="disc-panel">
     <div class="disc-head">
       <div class="disc-title">🎯 Disciplina ${streak>0?`<span class="streak">🔥 ${streak} día(s) en plan</span>`:`<span class="streak0">sin racha — registra hoy</span>`}</div>
-      <button class="btn btn-sm ${todayE?'':'btn-primary'}" onclick="openDisc()">${todayE?'✎ Editar hoy':'📝 Registrar hoy'}</button>
+      <button class="btn btn-sm ${todayHas?'':'btn-primary'}" onclick="openDisc()">${todayHas?'✎ Nota de hoy':'📝 Nota del día'}</button>
     </div>
     <div class="disc-strip">${strip}</div>
   </div>`;
@@ -1106,6 +1170,100 @@ async function deleteDisc(){
   try{ await discDelete(id); }catch(err){ toast("⚠️ "+err.message); return; }
   discipline=discipline.filter(x=>x.id!==id);
   closeDisc(); renderDiscipline(); toast("🗑 Día borrado");
+}
+
+/* ============================================================
+   ACTUALIZACIÓN DIARIA POR CUENTA (P&L / balance + trades + plan)
+   ============================================================ */
+let dayMode='pnl';
+function dayBase(a){ return (a.curBal!=null&&a.curBal!=='')?Number(a.curBal):((a.startBal!=null&&a.startBal!=='')?Number(a.startBal):0); }
+function setDayMode(m){
+  dayMode=m;
+  document.getElementById('modePnl').classList.toggle('active',m==='pnl');
+  document.getElementById('modeBal').classList.toggle('active',m==='balance');
+  document.getElementById('day-resultLabel').textContent = m==='pnl'?'Ganancia / pérdida de hoy ($)':'Balance nuevo ($)';
+  document.getElementById('day-result').placeholder = m==='pnl'?'+250 ó -180':'Ej: 51450';
+  dayPreview();
+}
+function dayCalc(){
+  const a=accounts.find(x=>x.id===document.getElementById('day-acct').value);
+  const base=a?dayBase(a):0;
+  const rv=document.getElementById('day-result').value.trim();
+  let delta=0;
+  if(rv!==''){ const n=Number(rv); if(!isNaN(n)) delta = dayMode==='pnl' ? n : (n-base); }
+  const date=document.getElementById('day-date').value;
+  const prior = (hasDiscipline && a) ? discipline.find(x=>x.id==='day_'+a.id+'_'+date) : null;
+  const priorPnl = prior&&prior.pnl!=null?Number(prior.pnl):0;
+  return { a, base, delta, newBal:base+delta, dayPnl:priorPnl+delta, prior };
+}
+function dayPreview(){
+  const c=dayCalc(); if(!c.a) return;
+  const trades=Number(document.getElementById('day-trades').value)||0;
+  const warns=[];
+  if(c.a.maxTradesDay && trades>Number(c.a.maxTradesDay)) warns.push(`⚠️ Te pasas de tu máximo de trades (${trades}/${c.a.maxTradesDay})`);
+  if(c.a.riskPerDay && c.dayPnl < -Math.abs(Number(c.a.riskPerDay))) warns.push(`⚠️ La pérdida supera tu riesgo diario (límite ${money(c.a.riskPerDay)})`);
+  const startBal=(c.a.startBal!=null&&c.a.startBal!=='')?Number(c.a.startBal):null;
+  const afterProfit = startBal!=null? c.newBal-startBal : null;
+  const pcol=(n)=>n>0?'var(--green)':(n<0?'var(--red)':'inherit');
+  document.getElementById('dayPreview').innerHTML =
+    `Balance: <b>${money(c.base)}</b> → <b>${money(c.newBal)}</b>`
+    + `<br>P&L de hoy: <b style="color:${pcol(c.dayPnl)}">${signMoney(c.dayPnl)}</b>`
+    + (afterProfit!=null?` &nbsp;·&nbsp; Profit total: <b style="color:${pcol(afterProfit)}">${signMoney(afterProfit)}</b>`:'')
+    + (c.prior?` <span style="color:var(--muted2)">(hoy ya tenías ${signMoney(Number(c.prior.pnl)||0)}; escribe solo lo nuevo)</span>`:'')
+    + (warns.length?`<br><span style="color:var(--yellow)">${warns.join('<br>')}</span>`:'');
+}
+function openDay(accountId,dateStr){
+  const a=accounts.find(x=>x.id===accountId); if(!a) return;
+  const date=dateStr||todayStr();
+  document.getElementById('day-acct').value=accountId;
+  document.getElementById('day-date').value=date;
+  document.getElementById('dayTitle').textContent='📈 '+a.alias;
+  const prior = hasDiscipline ? discipline.find(x=>x.id==='day_'+accountId+'_'+date) : null;
+  document.getElementById('day-result').value='';
+  document.getElementById('day-trades').value = prior&&prior.trades!=null?prior.trades:'';
+  document.getElementById('day-followed').value = prior?(prior.followed===true?'si':(prior.followed===false?'no':'')):'';
+  document.getElementById('day-note').value = prior?prior.note:'';
+  document.getElementById('dayDeleteBtn').style.display = prior?'inline-block':'none';
+  setDayMode('pnl');
+  document.getElementById('dayOverlay').classList.add('open');
+}
+function closeDay(){ document.getElementById('dayOverlay').classList.remove('open'); }
+async function saveDay(){
+  const c=dayCalc(); const a=c.a; if(!a) return;
+  const date=document.getElementById('day-date').value || todayStr();
+  const fv=document.getElementById('day-followed').value;
+  const trades=numD('day-trades');
+  const note=document.getElementById('day-note').value.trim();
+  // 1) actualizar la cuenta: balance + actividad + días mínimos
+  const prevLast=a.lastTraded;
+  a.curBal=c.newBal;
+  if(!a.lastTraded || date>=a.lastTraded) a.lastTraded=date;
+  const firstTimeThisDay = hasDiscipline ? !c.prior : (prevLast!==date);
+  if(firstTimeThisDay) a.daysDone=(Number(a.daysDone)||0)+1;
+  try{ await dbUpsert(a); }catch(e){ toast("⚠️ No se pudo guardar la cuenta: "+e.message); return; }
+  const i=accounts.findIndex(x=>x.id===a.id); if(i>=0) accounts[i]=a;
+  // 2) registrar el día en el diario de disciplina (si la migración está aplicada)
+  if(hasDiscipline){
+    const entry={ id:'day_'+a.id+'_'+date, date, accountId:a.id, accountAlias:a.alias,
+      trades, pnl:c.dayPnl, followed: fv==='si'?true:(fv==='no'?false:null), note };
+    try{
+      await discUpsert(entry);
+      const j=discipline.findIndex(x=>x.id===entry.id); if(j>=0) discipline[j]=entry; else discipline.push(entry);
+    }catch(e){ toast("Balance guardado (el diario falló: "+e.message+")"); }
+  }
+  cache(); closeDay(); render();
+  const profit=(a.startBal!=null&&a.startBal!=='')? c.newBal-Number(a.startBal):null;
+  toast(`✓ ${a.alias}: hoy ${signMoney(c.dayPnl)}${profit!=null?` · profit ${signMoney(profit)}`:''}`);
+}
+async function deleteDay(){
+  const a=accounts.find(x=>x.id===document.getElementById('day-acct').value);
+  const date=document.getElementById('day-date').value;
+  if(!a||!date) return;
+  if(!confirm("¿Borrar el registro de disciplina de este día? (el balance de la cuenta NO cambia)")) return;
+  const id='day_'+a.id+'_'+date;
+  try{ await discDelete(id); }catch(e){ toast("⚠️ "+e.message); return; }
+  discipline=discipline.filter(x=>x.id!==id);
+  closeDay(); render(); toast("🗑 Registro del día borrado");
 }
 
 /* init */
