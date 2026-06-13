@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Control de Cuentas · Prop Firms & Capital Propio</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --border:#2a3340;
+    --txt:#e6edf3; --muted:#8b98a8; --muted2:#5d6b7d;
+    --green:#3fb950; --green-bg:#10331b;
+    --yellow:#e3b341; --yellow-bg:#3a2f0d;
+    --red:#f85149; --red-bg:#3d1518;
+    --blue:#4493f8; --blue-bg:#0d2840;
+    --purple:#bc8cff;
+    --accent:#58a6ff;
+    --radius:12px;
+    --shadow:0 4px 16px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+    background:var(--bg);color:var(--txt);line-height:1.45;
+    padding:24px 18px 80px;max-width:1320px;margin:0 auto;
+  }
+  h1{font-size:1.55rem;font-weight:700;letter-spacing:-.02em}
+  h1 .sub{display:block;font-size:.8rem;font-weight:400;color:var(--muted);margin-top:2px}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  button{font-family:inherit;cursor:pointer;border:none;border-radius:8px;font-size:.86rem;font-weight:600;transition:.15s}
+  button:active{transform:translateY(1px)}
+  .btn{padding:9px 15px;background:var(--panel2);color:var(--txt);border:1px solid var(--border)}
+  .btn:hover{background:#252d3d;border-color:#3a4656}
+  .btn-primary{background:linear-gradient(135deg,#2563eb,#1d4ed8);border:none;color:#fff}
+  .btn-primary:hover{filter:brightness(1.12)}
+  .btn-danger{background:transparent;color:var(--red);border:1px solid #5a2226}
+  .btn-danger:hover{background:var(--red-bg)}
+  .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted)}
+  .btn-ghost:hover{color:var(--txt);border-color:#3a4656}
+  .btn-sm{padding:6px 11px;font-size:.78rem}
+
+  header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;margin-bottom:20px}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:22px}
+  .stat{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
+  .stat .label{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+  .stat .value{font-size:1.5rem;font-weight:700;margin-top:4px}
+  .stat .value.green{color:var(--green)} .stat .value.red{color:var(--red)} .stat .value.yellow{color:var(--yellow)}
+  .stat .foot{font-size:.72rem;color:var(--muted2);margin-top:2px}
+
+  .alerts{margin-bottom:22px}
+  .alert-box{border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;border:1px solid;display:flex;gap:12px;align-items:flex-start}
+  .alert-red{background:var(--red-bg);border-color:#5a2226}
+  .alert-yellow{background:var(--yellow-bg);border-color:#5c4a14}
+  .alert-box .ico{font-size:1.2rem;line-height:1}
+  .alert-box .body{flex:1;font-size:.88rem}
+  .alert-box .body b{color:var(--txt)}
+  .alert-box ul{margin:6px 0 0 0;list-style:none;display:flex;flex-direction:column;gap:4px}
+  .alert-box li{display:flex;justify-content:space-between;gap:10px;font-size:.84rem;padding:3px 0;border-top:1px solid rgba(255,255,255,.06)}
+  .alert-box li span.t{color:var(--muted)}
+
+  .filterbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px;font-size:.84rem}
+  .filterbar select{background:var(--panel);border:1px solid var(--border);color:var(--txt);
+    border-radius:8px;padding:7px 10px;font-family:inherit;font-size:.84rem}
+  .filterbar .chip{padding:6px 12px;border-radius:20px;background:var(--panel);border:1px solid var(--border);color:var(--muted);cursor:pointer}
+  .filterbar .chip.active{background:var(--blue-bg);border-color:var(--blue);color:var(--accent)}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(345px,1fr));gap:16px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px;
+    position:relative;display:flex;flex-direction:column;gap:12px;box-shadow:var(--shadow)}
+  .card.risk-red{border-color:#5a2226;box-shadow:0 0 0 1px rgba(248,81,73,.25)}
+  .card.risk-yellow{border-color:#5c4a14}
+  .card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+  .card-title{font-size:1.05rem;font-weight:700;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .firm-badge{font-size:.68rem;font-weight:700;padding:3px 8px;border-radius:6px;letter-spacing:.03em;text-transform:uppercase}
+  .meta-row{display:flex;gap:6px;flex-wrap:wrap;font-size:.72rem;color:var(--muted);margin-top:6px}
+  .pill{padding:2px 8px;border-radius:20px;background:var(--panel2);border:1px solid var(--border)}
+  .pill.type-eval{color:var(--yellow)} .pill.type-funded{color:var(--green)} .pill.type-propio{color:var(--purple)}
+
+  .profit-row{display:flex;justify-content:space-between;align-items:baseline;padding:10px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+  .profit-row .pl{font-size:1.45rem;font-weight:700}
+  .profit-row .pl.green{color:var(--green)} .profit-row .pl.red{color:var(--red)}
+  .profit-row .baln{text-align:right;font-size:.74rem;color:var(--muted)}
+
+  .kv{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;font-size:.8rem}
+  .kv .k{color:var(--muted);font-size:.72rem}
+  .kv .v{font-weight:600}
+
+  .bar{height:7px;background:var(--panel2);border-radius:5px;overflow:hidden;margin-top:4px}
+  .bar > i{display:block;height:100%;border-radius:5px}
+  .bar.green > i{background:var(--green)} .bar.blue > i{background:var(--blue)} .bar.yellow > i{background:var(--yellow)} .bar.red > i{background:var(--red)}
+
+  .inact{border-radius:8px;padding:9px 11px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .inact.green{background:var(--green-bg)} .inact.yellow{background:var(--yellow-bg)} .inact.red{background:var(--red-bg)} .inact.none{background:var(--panel2)}
+  .inact .lbl{font-size:.74rem;color:var(--muted)}
+  .inact .big{font-size:1.1rem;font-weight:700}
+  .inact.green .big{color:var(--green)} .inact.yellow .big{color:var(--yellow)} .inact.red .big{color:var(--red)}
+
+  .card-actions{display:flex;gap:7px;margin-top:auto;flex-wrap:wrap}
+  .card-actions .btn{flex:1 1 auto;text-align:center;min-width:84px}
+
+  .notes{font-size:.78rem;color:var(--muted);background:var(--panel2);border-radius:8px;padding:8px 10px;white-space:pre-wrap}
+
+  .empty{text-align:center;padding:60px 20px;color:var(--muted)}
+  .empty .big{font-size:2.5rem;margin-bottom:10px}
+
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:flex-start;justify-content:center;
+    padding:30px 14px;z-index:50;overflow-y:auto;backdrop-filter:blur(2px)}
+  .overlay.open{display:flex}
+  .modal{background:var(--panel);border:1px solid var(--border);border-radius:16px;width:100%;max-width:680px;box-shadow:var(--shadow)}
+  .modal-head{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--panel);border-radius:16px 16px 0 0;z-index:2}
+  .modal-head h2{font-size:1.15rem}
+  .modal-body{padding:20px 22px;display:grid;grid-template-columns:1fr 1fr;gap:14px 16px}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field.full{grid-column:1 / -1}
+  .field label{font-size:.74rem;color:var(--muted);font-weight:600}
+  .field label .hint{color:var(--muted2);font-weight:400}
+  .field input,.field select,.field textarea{
+    background:var(--bg);border:1px solid var(--border);color:var(--txt);border-radius:8px;
+    padding:9px 11px;font-family:inherit;font-size:.86rem;width:100%}
+  .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--accent)}
+  .field textarea{resize:vertical;min-height:60px}
+  .modal-foot{padding:16px 22px;border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;position:sticky;bottom:0;background:var(--panel);border-radius:0 0 16px 16px}
+  .section-label{grid-column:1/-1;font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);
+    margin-top:6px;padding-bottom:4px;border-bottom:1px solid var(--border);font-weight:700}
+  .close-x{background:transparent;color:var(--muted);font-size:1.4rem;border:none;width:32px;height:32px;border-radius:8px}
+  .close-x:hover{background:var(--panel2);color:var(--txt)}
+
+  .rule-preview{grid-column:1/-1;font-size:.78rem;color:var(--muted);background:var(--blue-bg);border:1px solid #1d3a55;border-radius:8px;padding:11px 13px;display:none;line-height:1.55}
+  .rule-preview.show{display:block}
+  .rule-preview b{color:var(--txt)}
+  .rule-preview .hl{color:var(--accent);font-weight:700}
+
+  footer{margin-top:40px;text-align:center;color:var(--muted2);font-size:.74rem;line-height:1.7}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--border);
+    color:var(--txt);padding:11px 18px;border-radius:10px;font-size:.85rem;box-shadow:var(--shadow);opacity:0;transition:.3s;pointer-events:none;z-index:100;max-width:90vw;text-align:center}
+  .toast.show{opacity:1}
+  @media(max-width:560px){.modal-body{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📊 Control de Cuentas
+    <span class="sub">Prop firms y capital propio · datos guardados en este navegador</span>
+  </h1>
+  <div class="toolbar">
+    <button class="btn btn-primary" onclick="openModal()">＋ Añadir cuenta</button>
+    <button class="btn btn-ghost btn-sm" onclick="exportData()">⭳ Exportar</button>
+    <button class="btn btn-ghost btn-sm" onclick="document.getElementById('importFile').click()">⭱ Importar</button>
+    <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importData(event)">
+  </div>
+</header>
+
+<div class="stats" id="stats"></div>
+<div class="alerts" id="alerts"></div>
+
+<div class="filterbar" id="filterbar">
+  <span style="color:var(--muted)">Filtrar:</span>
+  <span class="chip active" data-f="all" onclick="setFilter(this,'all')">Todas</span>
+  <span class="chip" data-f="risk" onclick="setFilter(this,'risk')">⚠️ En riesgo</span>
+  <span class="chip" data-f="Evaluación" onclick="setFilter(this,'Evaluación')">Evaluación</span>
+  <span class="chip" data-f="Funded" onclick="setFilter(this,'Funded')">Funded</span>
+  <span class="chip" data-f="Capital propio" onclick="setFilter(this,'Capital propio')">Capital propio</span>
+  <span style="flex:1"></span>
+  <select id="sortBy" onchange="render()">
+    <option value="risk">Orden: riesgo de inactividad</option>
+    <option value="profit">Orden: profit</option>
+    <option value="firm">Orden: firm</option>
+    <option value="alias">Orden: nombre</option>
+    <option value="lastTraded">Orden: última operación</option>
+  </select>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<!-- Modal -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="modalTitle">Añadir cuenta</h2>
+      <button class="close-x" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="f-id">
+
+      <div class="section-label">Identificación</div>
+      <div class="field">
+        <label>Alias / nombre de la cuenta *</label>
+        <input id="f-alias" placeholder="Ej: Topstep 50K #1" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Firm / empresa *</label>
+        <select id="f-firm" onchange="onFirmChange()"></select>
+      </div>
+      <div class="field">
+        <label>Programa / plan <span class="hint">(carga las reglas)</span></label>
+        <select id="f-program" onchange="applyPreset()"></select>
+      </div>
+      <div class="field">
+        <label>Tipo</label>
+        <select id="f-type">
+          <option>Evaluación</option>
+          <option>Funded</option>
+          <option>Capital propio</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Estado / fase</label>
+        <input id="f-status" placeholder="Ej: Fase 1, Activa, En payout…" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Tamaño de cuenta <span class="hint">(€/$)</span></label>
+        <input id="f-size" type="number" placeholder="50000">
+      </div>
+      <div class="field">
+        <label>Plataforma</label>
+        <input id="f-platform" list="platforms" placeholder="TopstepX, Tradovate, MT5…" autocomplete="off">
+        <datalist id="platforms">
+          <option>TopstepX</option><option>Tradovate</option><option>TradingView</option>
+          <option>Quantower</option><option>MetaTrader 5</option><option>MetaTrader 4</option>
+          <option>cTrader</option><option>Match-Trader</option><option>DXTrade</option>
+          <option>Rithmic</option><option>NinjaTrader</option><option>Sierra Chart</option>
+        </datalist>
+      </div>
+
+      <div class="rule-preview" id="rulePreview"></div>
+
+      <div class="section-label">Dinero</div>
+      <div class="field">
+        <label>Balance inicial</label>
+        <input id="f-startBal" type="number" placeholder="50000">
+      </div>
+      <div class="field">
+        <label>Balance / equity actual</label>
+        <input id="f-curBal" type="number" placeholder="51200">
+      </div>
+      <div class="field">
+        <label>Profit target <span class="hint">($ — opcional)</span></label>
+        <input id="f-target" type="number" placeholder="3000">
+      </div>
+      <div class="field">
+        <label>Coste pagado por la cuenta</label>
+        <input id="f-cost" type="number" placeholder="149">
+      </div>
+      <div class="field">
+        <label>Max drawdown <span class="hint">(texto libre)</span></label>
+        <input id="f-maxdd" placeholder="2000 trailing EOD">
+      </div>
+      <div class="field">
+        <label>Límite pérdida diaria</label>
+        <input id="f-dll" placeholder="1000">
+      </div>
+
+      <div class="section-label">Actividad y reglas de tiempo</div>
+      <div class="field">
+        <label>Límite de inactividad <span class="hint">(días sin operar)</span></label>
+        <input id="f-inact" type="number" placeholder="Ej: 30 — 0 o vacío = sin límite">
+      </div>
+      <div class="field">
+        <label>Fecha última operación</label>
+        <input id="f-lastTraded" type="date">
+      </div>
+      <div class="field">
+        <label>Días mínimos requeridos <span class="hint">(por ciclo)</span></label>
+        <input id="f-minDays" type="number" placeholder="Ej: 5 — 0 = ninguno">
+      </div>
+      <div class="field">
+        <label>Inicio del ciclo actual <span class="hint">(para contar días)</span></label>
+        <input id="f-cycleStart" type="date">
+      </div>
+      <div class="field">
+        <label>Días ya operados este ciclo <span class="hint">(manual)</span></label>
+        <input id="f-daysDone" type="number" placeholder="0">
+      </div>
+
+      <div class="section-label">Extras</div>
+      <div class="field">
+        <label>Info de payout</label>
+        <input id="f-payout" placeholder="Ej: min $125, split 90/10, cada 10d">
+      </div>
+      <div class="field">
+        <label>URL de login</label>
+        <input id="f-login" placeholder="https://…" autocomplete="off">
+      </div>
+      <div class="field full">
+        <label>Notas</label>
+        <textarea id="f-notes" placeholder="Cualquier cosa que no quieras olvidar de esta cuenta…"></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-danger" id="deleteBtn" onclick="deleteCurrent()" style="display:none">🗑 Eliminar</button>
+      <span style="flex:1"></span>
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveAccount()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div>Tus datos se guardan solo en este navegador (localStorage). <b>Haz Exportar de vez en cuando</b> como copia de seguridad.</div>
+  <div>Reglas precargadas (jun 2026) como valores por defecto editables — <b>verifica siempre con tu firm</b>, cambian a menudo.</div>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   REGLAS POR FIRM Y PROGRAMA  (valores por defecto editables)
+   Fuente: investigación oficial jun-2026 (FAQ/Help de cada firm).
+   inact = límite inactividad (días) · minDays = días mínimos req.
+   ============================================================ */
+const FIRMS = {
+  "The5ers": {
+    color:"#1f6feb", kind:"Forex/CFD", platform:"cTrader / MT5", seedInact:30,
+    inactNote:"30 días consecutivos sin operar = la cuenta EXPIRA (evaluación Y funded). Una sola operación resetea el contador.",
+    programs:{
+      "Hyper Growth (1 paso)":{type:"Evaluación",inact:30,minDays:0,maxdd:"6% estático",dll:"3% diario (pausa, no cierra)",payout:"Quincenal · 1er payout +14d · split→100%",note:"Objetivo 10%. Sin días mínimos, tiempo ilimitado."},
+      "Pro Growth (1 paso)":{type:"Evaluación",inact:30,minDays:3,maxdd:"6% estático",dll:"3% diario (CIERRA la cuenta)",payout:"Quincenal · split 75→100%",note:"Objetivo 10%. 3 días rentables/fase (≥0.5% c/u). OJO: el 3% diario cierra la cuenta, no pausa."},
+      "High Stakes (2 pasos)":{type:"Evaluación",inact:30,minDays:3,maxdd:"10% estático",dll:"5% EOD",payout:"Quincenal · min $150 · split 80→100%",note:"Objetivo F1 10% / F2 5%. 3 días rentables (≥0.5%) por CADA fase y escalado. Único con regla de consistencia."},
+      "Bootcamp (3 pasos)":{type:"Evaluación",inact:30,minDays:0,maxdd:"5% eval / 4% funded",dll:"3% (solo en funded)",payout:"Quincenal · split→100%",note:"Objetivo 6%/fase (3 fases). SL OBLIGATORIO en toda posición, máx 2% riesgo/trade. Máx 3 cuentas activas."},
+      "Funded (ya superada)":{type:"Funded",inact:30,minDays:0,maxdd:"Trailing (escala con beneficio)",dll:"según programa",payout:"Quincenal · min $150",note:"En funded el drawdown pasa a trailing. La inactividad de 30d sigue aplicando."}
+    }
+  },
+  "WSFunded": {
+    color:"#8957e5", kind:"Forex/CFD", platform:"MT5 / cTrader / Match-Trader", seedInact:30,
+    inactNote:"30 días sin operar = breach en los modelos de evaluación (Rapid/Classic/Ultra). En cuentas Instant no está documentado.",
+    programs:{
+      "Wall Street Rapid (1 fase)":{type:"Evaluación",inact:30,minDays:4,maxdd:"6% estático",dll:"4% diario",payout:"80/20 · 1er retiro +30d · luego /10d",note:"Objetivo 10%. 4 días operados (sin mín. beneficio). SL obligatorio <2 min. 1er retiro tardío (30d)."},
+      "Wall Street Classic (2 fases)":{type:"Evaluación",inact:30,minDays:4,maxdd:"8% estático",dll:"5% diario",payout:"80/20 · 1er retiro +15d · /10d",note:"Objetivo F1 8% / F2 5%. 4 días operados. SL obligatorio <2 min."},
+      "Wall Street Ultra (2 fases)":{type:"Evaluación",inact:30,minDays:4,maxdd:"10% estático",dll:"5% diario",payout:"80/20 · 1er retiro +15d · /10d",note:"Objetivo F1 10% / F2 5%. 4 días operados."},
+      "Instant Standard (funded)":{type:"Funded",inact:0,minDays:4,maxdd:"6% trailing",dll:"3% diario",payout:"80/20 · 1er retiro +15d · /10d · sin mínimo",note:"4 días RENTABLES (≥0.5% c/u) antes de retirar. Consistencia 30%. Riesgo máx 1%/idea. Inactividad NO documentada."},
+      "Instant Pro (funded)":{type:"Funded",inact:0,minDays:4,maxdd:"5% trailing",dll:"3% diario",payout:"80/20 · 1er retiro +15d · /10d",note:"4 días rentables. Consistencia 15% (más estricta). Riesgo 1%/idea. Inactividad NO documentada."}
+    }
+  },
+  "Lucid Trading": {
+    color:"#1f883d", kind:"Futuros", platform:"Tradovate / TradingView / NinjaTrader", seedInact:30,
+    inactNote:"30 días naturales sin operar = la cuenta se ELIMINA permanentemente (irreversible). Aplica a evaluación Y funded. 1 trade/mes la mantiene viva.",
+    programs:{
+      "LucidPro — Evaluación":{type:"Evaluación",inact:30,minDays:0,maxdd:"EOD trailing (50K $2,000)",dll:"50K $1,200 (25K sin DLL)",payout:"—",note:"Sin días mínimos para pasar (vale 1 día). Drawdown EOD (sin spike-out intradía). Objetivo 50K $3,000."},
+      "LucidPro — Funded":{type:"Funded",inact:30,minDays:0,maxdd:"EOD trailing (50K $2,000)",dll:"50K $1,200",payout:"Min $500 · 90/10",note:"Payout: profit goal + consistencia 40% + deben pasar 3 días naturales + balance > buffer (MLL+$100)."},
+      "LucidFlex — Evaluación":{type:"Evaluación",inact:30,minDays:0,maxdd:"EOD trailing (50K $3,000)",dll:"Sin DLL",payout:"—",note:"Sin DLL. Consistencia 50% en eval (suele forzar 2+ días). Objetivo 50K $3,000."},
+      "LucidFlex — Funded":{type:"Funded",inact:30,minDays:5,maxdd:"EOD trailing (50K $3,000)",dll:"Sin DLL",payout:"Min $500 · 90/10 · paga 50% (cap 50K $2,000)",note:"5 días RENTABLES separados (50K ≥$150/día). Sin consistencia en funded. El contador se reinicia tras cada payout."},
+      "LucidDirect — Instant Funded":{type:"Funded",inact:30,minDays:5,maxdd:"EOD trailing (50K $2,000)",dll:"50K $1,200 / LucidScale 60% pico",payout:"Min $500 · 90/10",note:"Instant funding: reglas desde el día 1. ~5 días de trading. Consistencia 20% (la más dura)."}
+    }
+  },
+  "Topstep": {
+    color:"#cf222e", kind:"Futuros", platform:"TopstepX", seedInact:30,
+    inactNote:"OJO: la regla de 30 días sin operar SOLO aplica a la cuenta financiada (XFA), NO al Combine (es suscripción mensual y no cierra por inactividad).",
+    programs:{
+      "Trading Combine 50K":{type:"Evaluación",inact:0,minDays:0,maxdd:"$2,000 trailing EOD",dll:"$1,000 (opcional)",payout:"—",note:"El Combine NO cierra por inactividad (suscripción con rebill). Objetivo $3,000. Consistencia 50% (mejor día <$1,500)."},
+      "Trading Combine 100K":{type:"Evaluación",inact:0,minDays:0,maxdd:"$3,000 trailing EOD",dll:"$2,000 (opcional)",payout:"—",note:"Objetivo $6,000. Consistencia 50% (mejor día <$3,000)."},
+      "Trading Combine 150K":{type:"Evaluación",inact:0,minDays:0,maxdd:"$4,500 trailing EOD",dll:"$3,000 (opcional)",payout:"—",note:"Objetivo $9,000. Consistencia 50% (mejor día <$4,500)."},
+      "XFA 50K (Standard)":{type:"Funded",inact:30,minDays:5,maxdd:"$2,000 trailing (se ancla en $0 tras 1er payout)",dll:"$1,000 (oblig. fuera de TopstepX)",payout:"Min $125 · 90/10 · cap $2,000/payout",note:"30 días sin operar PUEDE cerrarla. Standard = 5 winning days ($150+ neto c/u). Empieza en $0, scaling plan."},
+      "XFA 50K (Consistency)":{type:"Funded",inact:30,minDays:3,maxdd:"$2,000 trailing",dll:"$1,000",payout:"Min $125 · 90/10 · cap $3,000/payout",note:"Consistency = 3 días + regla 40% (mejor día ≤40% del total) + $6,000 acumulado."},
+      "XFA 100K (Standard)":{type:"Funded",inact:30,minDays:5,maxdd:"$3,000 trailing",dll:"$2,000",payout:"Min $125 · cap $3,000",note:"5 winning days $150+. Scaling plan. Inactividad 30d."},
+      "XFA 100K (Consistency)":{type:"Funded",inact:30,minDays:3,maxdd:"$3,000 trailing",dll:"$2,000",payout:"Min $125 · cap hasta $6,000",note:"3 días + 40% consistency."},
+      "XFA 150K (Standard)":{type:"Funded",inact:30,minDays:5,maxdd:"$4,500 trailing",dll:"$3,000",payout:"Min $125 · cap $5,000",note:"5 winning days $150+."},
+      "XFA 150K (Consistency)":{type:"Funded",inact:30,minDays:3,maxdd:"$4,500 trailing",dll:"$3,000",payout:"Min $125 · cap hasta $6,000",note:"3 días + 40% consistency."},
+      "Live Funded (LFA)":{type:"Funded",inact:0,minDays:5,maxdd:"$1,000 fijo (no trailing)",dll:"auto (50K $1,000 / 100K $2,000 / 150K $3,000)",payout:"90/10 · sin cap $",note:"Capital real. 5 Benchmark Days ($150+) por payout. Cerrar todo antes 3:10 PM CT. Inactividad no publicada."}
+    }
+  },
+  "Capital propio": {
+    color:"#bc8cff", kind:"Capital propio", platform:"", seedInact:0,
+    inactNote:"Tu propio dinero: sin reglas de prop firm ni inactividad.",
+    programs:{ "Cuenta propia":{type:"Capital propio",inact:0,minDays:0,maxdd:"",dll:"",payout:"",note:"Sin reglas externas. Define tú tu gestión de riesgo."} }
+  },
+  "Otra": {
+    color:"#6e7681", kind:"", platform:"", seedInact:30,
+    inactNote:"Firm no listada: rellena las reglas manualmente.",
+    programs:{ "Personalizada":{type:"Evaluación",inact:30,minDays:0,maxdd:"",dll:"",payout:"",note:"Rellena las reglas según tu firm."} }
+  }
+};
+
+const STORE_KEY = "propfirm_accounts_v1";
+let accounts = [];
+let filter = "all";
+
+/* ---------- utilidades de fecha ---------- */
+function todayStr(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function parseD(s){ if(!s) return null; const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
+function daysBetween(a,b){ return Math.floor((b-a)/86400000); }
+function fmtDate(s){ if(!s) return "—"; const d=parseD(s); return d.toLocaleDateString("es-ES",{day:"2-digit",month:"short",year:"numeric"}); }
+function money(n){ if(n===null||n===undefined||n==="") return "—"; const num=Number(n); return num.toLocaleString("es-ES",{maximumFractionDigits:0}); }
+function signMoney(n){ const num=Number(n); const s=Math.abs(num).toLocaleString("es-ES",{maximumFractionDigits:0}); return (num>0?"+":(num<0?"-":""))+s; }
+
+/* ---------- persistencia ---------- */
+function load(){ try{ accounts = JSON.parse(localStorage.getItem(STORE_KEY)) || []; }catch(e){ accounts=[]; } }
+function save(){ localStorage.setItem(STORE_KEY, JSON.stringify(accounts)); }
+
+/* ---------- siembra inicial (solo la primera vez) ---------- */
+function seedIfFirstRun(){
+  if(localStorage.getItem(STORE_KEY)!==null) return;
+  const t=todayStr();
+  accounts = ["The5ers","WSFunded","Lucid Trading","Topstep"].map((f,i)=>{
+    const fo=FIRMS[f];
+    return {
+      id:"seed"+i+"_"+f.replace(/\W/g,""), alias:f+" #1", firm:f, program:"", type:"Evaluación",
+      status:"✍️ Completar datos", size:null, platform:fo.platform,
+      startBal:null, curBal:null, target:null, cost:null, maxdd:"", dll:"",
+      inact:fo.seedInact, lastTraded:"", minDays:0, cycleStart:t, daysDone:0,
+      payout:"", login:"", notes:"Edita esta tarjeta y elige tu programa exacto para cargar las reglas.", createdAt:t
+    };
+  });
+  save();
+}
+
+/* ---------- cálculos derivados ---------- */
+function derive(a){
+  const today = parseD(todayStr());
+  const last = a.lastTraded ? parseD(a.lastTraded) : null;
+  const daysSince = last ? daysBetween(last, today) : null;
+  const profit = (a.curBal!==""&&a.curBal!=null&&a.startBal!==""&&a.startBal!=null) ? Number(a.curBal)-Number(a.startBal) : null;
+
+  let risk = "none", remaining = null;
+  if(a.inact && a.inact>0){
+    const refDays = daysSince!==null ? daysSince : (a.createdAt ? daysBetween(parseD(a.createdAt), today) : 0);
+    remaining = a.inact - refDays;
+    if(remaining<=1) risk="red";
+    else if(remaining <= Math.max(3, Math.ceil(a.inact*0.3))) risk="yellow";
+    else risk="green";
+  }
+  return { daysSince, profit, risk, remaining, last };
+}
+
+/* ---------- render ---------- */
+function setFilter(el,f){
+  filter=f;
+  document.querySelectorAll('.filterbar .chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  render();
+}
+
+function render(){ renderStats(); renderAlerts(); renderGrid(); }
+
+function renderStats(){
+  let totalProfit=0, withProfit=0, inRisk=0, totalCost=0;
+  accounts.forEach(a=>{
+    const d=derive(a);
+    if(d.profit!==null){ totalProfit+=d.profit; withProfit++; }
+    if(d.risk==="red"||d.risk==="yellow") inRisk++;
+    if(a.cost) totalCost+=Number(a.cost);
+  });
+  const pc = totalProfit>0?"green":(totalProfit<0?"red":"");
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="label">Cuentas</div><div class="value">${accounts.length}</div>
+      <div class="foot">${accounts.filter(a=>a.type==='Funded').length} funded · ${accounts.filter(a=>a.type==='Evaluación').length} eval · ${accounts.filter(a=>a.type==='Capital propio').length} propias</div></div>
+    <div class="stat"><div class="label">Profit total</div><div class="value ${pc}">${withProfit?signMoney(totalProfit):"—"}</div>
+      <div class="foot">${withProfit} cuentas con balance</div></div>
+    <div class="stat"><div class="label">En riesgo</div><div class="value ${inRisk?'red':'green'}">${inRisk}</div>
+      <div class="foot">inactividad cerca del límite</div></div>
+    <div class="stat"><div class="label">Invertido en fees</div><div class="value">${totalCost?money(totalCost):"—"}</div>
+      <div class="foot">coste de evaluaciones</div></div>`;
+}
+
+function renderAlerts(){
+  const reds=[], yellows=[];
+  accounts.forEach(a=>{ const d=derive(a); if(d.risk==="red") reds.push({a,d}); else if(d.risk==="yellow") yellows.push({a,d}); });
+  let html="";
+  if(reds.length){
+    html += `<div class="alert-box alert-red"><div class="ico">🚨</div><div class="body">
+      <b>${reds.length} cuenta(s) en peligro de inactividad</b> — opera YA o márcalas como operadas:
+      <ul>${reds.map(({a,d})=>`<li><span>${esc(a.alias)} <span class="t">(${esc(a.firm)})</span></span>
+        <span>${d.remaining<=0?'¡LÍMITE SUPERADO!':d.remaining+' día(s) restantes'}</span></li>`).join("")}</ul></div></div>`;
+  }
+  if(yellows.length){
+    html += `<div class="alert-box alert-yellow"><div class="ico">⚠️</div><div class="body">
+      <b>${yellows.length} cuenta(s) acercándose al límite de inactividad</b>
+      <ul>${yellows.map(({a,d})=>`<li><span>${esc(a.alias)} <span class="t">(${esc(a.firm)})</span></span>
+        <span>${d.remaining} día(s) restantes</span></li>`).join("")}</ul></div></div>`;
+  }
+  document.getElementById('alerts').innerHTML=html;
+}
+
+function renderGrid(){
+  const grid=document.getElementById('grid');
+  let list=[...accounts];
+  if(filter==="risk") list=list.filter(a=>{const r=derive(a).risk;return r==="red"||r==="yellow";});
+  else if(filter!=="all") list=list.filter(a=>a.type===filter);
+
+  const sort=document.getElementById('sortBy').value;
+  const riskRank={red:0,yellow:1,none:2,green:3};
+  list.sort((x,y)=>{
+    const dx=derive(x), dy=derive(y);
+    if(sort==="risk") return (riskRank[dx.risk]-riskRank[dy.risk]) || ((dx.remaining??999)-(dy.remaining??999));
+    if(sort==="profit") return (dy.profit??-1e15)-(dx.profit??-1e15);
+    if(sort==="firm") return (x.firm||"").localeCompare(y.firm||"");
+    if(sort==="alias") return (x.alias||"").localeCompare(y.alias||"");
+    if(sort==="lastTraded") return (y.lastTraded||"").localeCompare(x.lastTraded||"");
+    return 0;
+  });
+
+  if(!list.length){
+    grid.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="big">🗂️</div>
+      ${accounts.length? "Ninguna cuenta con este filtro." : "Aún no has añadido cuentas.<br>Pulsa <b>＋ Añadir cuenta</b> para empezar."}</div>`;
+    return;
+  }
+  grid.innerHTML = list.map(card).join("");
+}
+
+function card(a){
+  const d=derive(a);
+  const firmColor=(FIRMS[a.firm]||{}).color || "#6e7681";
+  const typeClass = a.type==="Funded"?"type-funded":(a.type==="Capital propio"?"type-propio":"type-eval");
+
+  let targetBar="";
+  if(a.target && Number(a.target)>0 && d.profit!==null){
+    const pct=Math.max(0,Math.min(100,(d.profit/Number(a.target))*100));
+    targetBar=`<div><div class="k">Profit target ${money(a.target)} · ${pct.toFixed(0)}%</div>
+      <div class="bar ${pct>=100?'green':'blue'}"><i style="width:${pct}%"></i></div></div>`;
+  }
+  let minBar="";
+  if(a.minDays && Number(a.minDays)>0){
+    const done=Number(a.daysDone||0), need=Number(a.minDays);
+    const pct=Math.max(0,Math.min(100,(done/need)*100));
+    minBar=`<div><div class="k">Días mínimos ${done}/${need}</div>
+      <div class="bar ${done>=need?'green':'yellow'}"><i style="width:${pct}%"></i></div></div>`;
+  }
+  let inactBox="";
+  if(a.inact && a.inact>0){
+    const txt = d.daysSince===null
+      ? `Sin fecha de última op. · margen ${d.remaining<=0?'agotado':d.remaining+'d'}`
+      : `Hace ${d.daysSince} día(s) · quedan ${d.remaining<=0?'0 (¡SUPERADO!)':d.remaining}`;
+    inactBox=`<div class="inact ${d.risk}">
+      <div><div class="lbl">Inactividad (límite ${a.inact}d)</div><div style="font-size:.8rem">${txt}</div></div>
+      <div style="text-align:right"><div class="big">${d.remaining<=0?'⛔':d.remaining}</div></div></div>`;
+  } else {
+    inactBox=`<div class="inact none"><div><div class="lbl">Inactividad</div><div style="font-size:.8rem">Sin límite (revisa notas/programa)</div></div></div>`;
+  }
+
+  return `<div class="card risk-${d.risk}">
+    <div class="card-top">
+      <div>
+        <div class="card-title">${esc(a.alias)||"(sin nombre)"}</div>
+        <div class="meta-row">
+          <span class="firm-badge" style="background:${firmColor}22;color:${firmColor}">${esc(a.firm)}</span>
+          <span class="pill ${typeClass}">${esc(a.type)}</span>
+          ${a.program?`<span class="pill">${esc(a.program)}</span>`:""}
+          ${a.status?`<span class="pill">${esc(a.status)}</span>`:""}
+          ${a.size?`<span class="pill">${money(a.size)}</span>`:""}
+          ${a.platform?`<span class="pill">${esc(a.platform)}</span>`:""}
+        </div>
+      </div>
+    </div>
+
+    <div class="profit-row">
+      <div class="pl ${d.profit>0?'green':(d.profit<0?'red':'')}">${d.profit!==null?signMoney(d.profit):"—"}</div>
+      <div class="baln">${a.startBal!==""&&a.startBal!=null?`inicio ${money(a.startBal)}`:""}<br>${a.curBal!==""&&a.curBal!=null?`actual ${money(a.curBal)}`:""}</div>
+    </div>
+
+    ${(targetBar||minBar)?`<div class="kv">${targetBar}${minBar}</div>`:""}
+
+    ${inactBox}
+
+    <div class="kv">
+      <div><div class="k">Última operación</div><div class="v">${fmtDate(a.lastTraded)}</div></div>
+      <div><div class="k">Max DD / Pérdida diaria</div><div class="v" style="font-size:.76rem">${esc(a.maxdd)||"—"}${a.dll?" · "+esc(a.dll):""}</div></div>
+      ${a.payout?`<div style="grid-column:1/-1"><div class="k">Payout</div><div class="v" style="font-size:.76rem;font-weight:500">${esc(a.payout)}</div></div>`:""}
+    </div>
+
+    ${a.notes?`<div class="notes">${esc(a.notes)}</div>`:""}
+
+    <div class="card-actions">
+      <button class="btn btn-sm" style="background:var(--green-bg);border-color:#1f5128;color:var(--green)" onclick="markTraded('${a.id}')">✓ Operé hoy</button>
+      <button class="btn btn-sm" onclick="editAccount('${a.id}')">✎ Editar</button>
+      ${a.minDays>0?`<button class="btn btn-sm" onclick="resetCycle('${a.id}')" title="Reiniciar contador de días mínimos (nuevo ciclo/payout)">↺ Ciclo</button>`:""}
+      ${a.login?`<button class="btn btn-sm" onclick="window.open('${encodeURI(a.login)}','_blank')">↗ Login</button>`:""}
+    </div>
+  </div>`;
+}
+
+function esc(s){ return (s==null?"":String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ---------- acciones de tarjeta ---------- */
+function markTraded(id){
+  const a=accounts.find(x=>x.id===id); if(!a) return;
+  const t=todayStr();
+  if(a.lastTraded!==t){ a.daysDone=(Number(a.daysDone)||0)+1; }
+  a.lastTraded=t;
+  save(); render();
+  toast(`✓ "${a.alias}" marcada como operada hoy (${a.daysDone} día(s) este ciclo)`);
+}
+function resetCycle(id){
+  const a=accounts.find(x=>x.id===id); if(!a) return;
+  if(confirm(`¿Reiniciar el contador de días mínimos de "${a.alias}"? (nuevo ciclo / tras payout)`)){
+    a.daysDone=0; a.cycleStart=todayStr();
+    save(); render(); toast("↺ Ciclo reiniciado (0 días)");
+  }
+}
+
+/* ---------- modal ---------- */
+function openModal(){
+  document.getElementById('modalTitle').textContent="Añadir cuenta";
+  document.getElementById('deleteBtn').style.display="none";
+  clearForm();
+  buildFirmSelect();
+  buildProgramSelect(document.getElementById('f-firm').value);
+  applyPreset();
+  document.getElementById('f-cycleStart').value=todayStr();
+  document.getElementById('overlay').classList.add('open');
+}
+function closeModal(){ document.getElementById('overlay').classList.remove('open'); }
+
+function buildFirmSelect(sel){
+  document.getElementById('f-firm').innerHTML=Object.keys(FIRMS).map(f=>`<option ${f===sel?'selected':''}>${f}</option>`).join("");
+}
+function buildProgramSelect(firm, sel){
+  const fo=FIRMS[firm]||FIRMS["Otra"];
+  const keys=Object.keys(fo.programs);
+  document.getElementById('f-program').innerHTML=keys.map(p=>`<option ${p===sel?'selected':''}>${p}</option>`).join("");
+}
+function onFirmChange(){
+  const firm=document.getElementById('f-firm').value;
+  buildProgramSelect(firm);
+  applyPreset(); // aplica el primer programa de la firm
+}
+
+function applyPreset(){
+  const firm=document.getElementById('f-firm').value;
+  const fo=FIRMS[firm]; if(!fo) return;
+  const program=document.getElementById('f-program').value;
+  const p=fo.programs[program]; if(!p) return;
+  const set=(id,v)=>{ if(v!=null && v!=="") document.getElementById(id).value=v; };
+
+  // estas reglas SE SOBREESCRIBEN al elegir programa (es una acción explícita)
+  document.getElementById('f-type').value=p.type||"Evaluación";
+  document.getElementById('f-inact').value=(p.inact!=null?p.inact:"");
+  document.getElementById('f-minDays').value=(p.minDays!=null?p.minDays:"");
+  document.getElementById('f-maxdd').value=p.maxdd||"";
+  document.getElementById('f-dll').value=p.dll||"";
+  document.getElementById('f-payout').value=p.payout||"";
+  // plataforma solo si está vacía
+  const plat=document.getElementById('f-platform'); if(!plat.value) plat.value=fo.platform||"";
+
+  // preview de reglas
+  const pv=document.getElementById('rulePreview');
+  pv.classList.add('show');
+  pv.innerHTML=`<b>${esc(firm)} · ${esc(program)}</b> <span style="color:var(--muted2)">(${esc(fo.kind)})</span><br>
+    ⏱️ ${esc(fo.inactNote)}<br>
+    📋 ${esc(p.note)}<br>
+    <span class="hl">Inactividad:</span> ${p.inact?p.inact+'d':'sin límite'} ·
+    <span class="hl">Días mín.:</span> ${p.minDays||0} ·
+    <span class="hl">DD:</span> ${esc(p.maxdd)||'—'} ·
+    <span class="hl">Daily:</span> ${esc(p.dll)||'—'}`;
+}
+
+function clearForm(){
+  ["f-id","f-alias","f-status","f-size","f-platform","f-startBal","f-curBal","f-target","f-cost",
+   "f-maxdd","f-dll","f-inact","f-lastTraded","f-minDays","f-cycleStart","f-daysDone","f-payout","f-login","f-notes"]
+   .forEach(id=>document.getElementById(id).value="");
+  document.getElementById('f-type').value="Evaluación";
+  document.getElementById('rulePreview').classList.remove('show');
+}
+
+function editAccount(id){
+  const a=accounts.find(x=>x.id===id); if(!a) return;
+  document.getElementById('modalTitle').textContent="Editar cuenta";
+  document.getElementById('deleteBtn').style.display="inline-block";
+  clearForm();
+  buildFirmSelect(a.firm);
+  buildProgramSelect(a.firm, a.program); // fija el programa SIN disparar applyPreset (conserva tus datos)
+  const set=(id,v)=>document.getElementById(id).value=(v==null?"":v);
+  set('f-id',a.id); set('f-alias',a.alias); set('f-status',a.status); set('f-size',a.size);
+  set('f-platform',a.platform); set('f-startBal',a.startBal); set('f-curBal',a.curBal); set('f-target',a.target);
+  set('f-cost',a.cost); set('f-maxdd',a.maxdd); set('f-dll',a.dll); set('f-inact',a.inact);
+  set('f-lastTraded',a.lastTraded); set('f-minDays',a.minDays); set('f-cycleStart',a.cycleStart);
+  set('f-daysDone',a.daysDone); set('f-payout',a.payout); set('f-login',a.login); set('f-notes',a.notes);
+  document.getElementById('f-type').value=a.type||"Evaluación";
+  // muestra el preview de las reglas del programa actual sin sobreescribir
+  showPreviewOnly(a.firm,a.program);
+  document.getElementById('overlay').classList.add('open');
+}
+function showPreviewOnly(firm,program){
+  const fo=FIRMS[firm]; const p=fo&&fo.programs[program];
+  const pv=document.getElementById('rulePreview');
+  if(!p){ pv.classList.remove('show'); return; }
+  pv.classList.add('show');
+  pv.innerHTML=`<b>${esc(firm)} · ${esc(program)}</b> <span style="color:var(--muted2)">(${esc(fo.kind)})</span><br>
+    ⏱️ ${esc(fo.inactNote)}<br>📋 ${esc(p.note)}<br>
+    <span style="color:var(--muted2)">Cambia el programa arriba para recargar estas reglas por defecto.</span>`;
+}
+
+function val(id){ const v=document.getElementById(id).value.trim(); return v===""?"":v; }
+function numVal(id){ const v=document.getElementById(id).value.trim(); return v===""?null:Number(v); }
+
+function saveAccount(){
+  const alias=val('f-alias');
+  if(!alias){ toast("⚠️ Pon al menos un alias para la cuenta"); return; }
+  const id=val('f-id');
+  const data={
+    id: id || ("a"+Date.now()+Math.floor(Math.random()*1000)),
+    alias, firm:val('f-firm'), program:val('f-program'), type:val('f-type'), status:val('f-status'),
+    size:numVal('f-size'), platform:val('f-platform'),
+    startBal:numVal('f-startBal'), curBal:numVal('f-curBal'), target:numVal('f-target'), cost:numVal('f-cost'),
+    maxdd:val('f-maxdd'), dll:val('f-dll'),
+    inact:numVal('f-inact'), lastTraded:val('f-lastTraded'),
+    minDays:numVal('f-minDays'), cycleStart:val('f-cycleStart'), daysDone:numVal('f-daysDone')||0,
+    payout:val('f-payout'), login:val('f-login'), notes:val('f-notes'),
+  };
+  if(id){
+    const i=accounts.findIndex(x=>x.id===id);
+    data.createdAt=accounts[i].createdAt||todayStr();
+    accounts[i]=data;
+  }else{
+    data.createdAt=todayStr();
+    accounts.push(data);
+  }
+  save(); closeModal(); render();
+  toast(id?"✓ Cuenta actualizada":"✓ Cuenta añadida");
+}
+
+function deleteCurrent(){
+  const id=val('f-id'); if(!id) return;
+  const a=accounts.find(x=>x.id===id);
+  if(confirm(`¿Eliminar la cuenta "${a?a.alias:''}"? No se puede deshacer.`)){
+    accounts=accounts.filter(x=>x.id!==id);
+    save(); closeModal(); render();
+    toast("🗑 Cuenta eliminada");
+  }
+}
+
+/* ---------- export / import ---------- */
+function exportData(){
+  const blob=new Blob([JSON.stringify(accounts,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url; a.download="control-cuentas-"+todayStr()+".json"; a.click();
+  URL.revokeObjectURL(url);
+  toast("⭳ Copia exportada");
+}
+function importData(ev){
+  const file=ev.target.files[0]; if(!file) return;
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      const data=JSON.parse(e.target.result);
+      if(!Array.isArray(data)) throw 0;
+      if(accounts.length && !confirm("¿Reemplazar las cuentas actuales por las del archivo? (Cancelar = fusionar)")){
+        const ids=new Set(accounts.map(a=>a.id));
+        data.forEach(d=>{ if(!ids.has(d.id)) accounts.push(d); });
+      } else { accounts=data; }
+      save(); render(); toast("⭱ Datos importados");
+    }catch(err){ toast("⚠️ Archivo no válido"); }
+  };
+  r.readAsText(file);
+  ev.target.value="";
+}
+
+let toastTimer;
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+document.getElementById('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay') closeModal(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
+
+/* init */
+seedIfFirstRun();
+load();
+buildFirmSelect();
+render();
+</script>
+</body>
+</html>

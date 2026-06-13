@@ -1,0 +1,12 @@
+# Sitio estático de un solo archivo: se publica la raíz del repo tal cual.
+[build]
+  publish = "."
+
+# Cabeceras de seguridad y privacidad (es una herramienta personal: no indexar).
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"

@@ -1,0 +1,12 @@
+# Copias de seguridad exportadas desde el panel — CONTIENEN TUS DATOS REALES, no subir
+control-cuentas-*.json
+*.backup.json
+*.local.json
+
+# Basura del SO / OneDrive
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Netlify
+.netlify/
