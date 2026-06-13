@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
 <title>Control de Cuentas · Prop Firms & Capital Propio</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --border:#2a3340;
@@ -41,6 +43,8 @@
 
   header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;margin-bottom:20px}
   .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .user-chip{display:flex;align-items:center;gap:8px;font-size:.78rem;color:var(--muted);background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:5px 6px 5px 12px}
+  .user-chip .dot{width:7px;height:7px;border-radius:50%;background:var(--green)}
 
   .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:22px}
   .stat{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
@@ -136,20 +140,62 @@
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--border);
     color:var(--txt);padding:11px 18px;border-radius:10px;font-size:.85rem;box-shadow:var(--shadow);opacity:0;transition:.3s;pointer-events:none;z-index:100;max-width:90vw;text-align:center}
   .toast.show{opacity:1}
+
+  /* ---- Pantalla de login ---- */
+  #authScreen{min-height:78vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .auth-card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:30px 28px;max-width:380px;width:100%;box-shadow:var(--shadow)}
+  .auth-card .logo{font-size:1.5rem;font-weight:700;letter-spacing:-.02em;margin-bottom:2px}
+  .auth-card .tag{color:var(--muted);font-size:.84rem;margin-bottom:24px}
+  .auth-card label{font-size:.74rem;color:var(--muted);font-weight:600;display:block;margin-bottom:5px}
+  .auth-card input{background:var(--bg);border:1px solid var(--border);color:var(--txt);border-radius:8px;padding:11px 12px;font-family:inherit;font-size:.92rem;width:100%;margin-bottom:14px}
+  .auth-card input:focus{outline:none;border-color:var(--accent)}
+  .auth-card .btn-primary{width:100%;padding:12px;font-size:.95rem}
+  .auth-err{color:var(--red);font-size:.82rem;min-height:20px;margin-bottom:6px}
+  .auth-loading{color:var(--muted);font-size:.9rem;text-align:center;padding:20px}
+  .link-btn{background:none;border:none;color:var(--accent);font-size:.8rem;cursor:pointer;padding:10px 0 0;display:block;width:100%;text-align:center;font-weight:500}
+  .config-warn{background:var(--yellow-bg);border:1px solid #5c4a14;border-radius:10px;padding:14px;font-size:.82rem;color:var(--txt);margin-top:14px;line-height:1.5}
+
   @media(max-width:560px){.modal-body{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 
+<!-- ====================== PANTALLA DE LOGIN ====================== -->
+<div id="authScreen">
+  <div class="auth-card">
+    <div class="logo">📊 Control de Cuentas</div>
+    <div class="tag">Acceso privado</div>
+
+    <div id="authLoading" class="auth-loading">Comprobando sesión…</div>
+
+    <form id="loginForm" style="display:none" onsubmit="return doLogin(event)">
+      <label>Email</label>
+      <input id="authEmail" type="email" autocomplete="username" placeholder="tu@email.com" required>
+      <label>Contraseña</label>
+      <input id="authPass" type="password" autocomplete="current-password" placeholder="••••••••" required>
+      <div class="auth-err" id="authErr"></div>
+      <button type="submit" class="btn-primary" id="authBtn">Entrar</button>
+      <button type="button" class="link-btn" onclick="forgotPassword()">¿Olvidaste la contraseña?</button>
+    </form>
+
+    <div id="configWarn" class="config-warn" style="display:none"></div>
+  </div>
+</div>
+
+<!-- ====================== APP (oculta hasta login) ====================== -->
+<div id="app" style="display:none">
+
 <header>
   <h1>📊 Control de Cuentas
-    <span class="sub">Prop firms y capital propio · datos guardados en este navegador</span>
+    <span class="sub">Prop firms y capital propio · sincronizado en la nube</span>
   </h1>
   <div class="toolbar">
     <button class="btn btn-primary" onclick="openModal()">＋ Añadir cuenta</button>
     <button class="btn btn-ghost btn-sm" onclick="exportData()">⭳ Exportar</button>
     <button class="btn btn-ghost btn-sm" onclick="document.getElementById('importFile').click()">⭱ Importar</button>
     <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importData(event)">
+    <span class="user-chip"><span class="dot"></span><span id="userEmail"></span>
+      <button class="btn btn-sm" onclick="doLogout()">Salir</button></span>
   </div>
 </header>
 
@@ -174,6 +220,12 @@
 </div>
 
 <div class="grid" id="grid"></div>
+
+<footer>
+  <div>Tus datos se guardan en tu base de datos privada (Supabase) y se sincronizan en todos tus dispositivos.</div>
+  <div>Reglas precargadas (jun 2026) como valores por defecto editables — <b>verifica siempre con tu firm</b>, cambian a menudo.</div>
+</footer>
+</div><!-- /#app -->
 
 <!-- Modal -->
 <div class="overlay" id="overlay">
@@ -298,18 +350,18 @@
   </div>
 </div>
 
-<footer>
-  <div>Tus datos se guardan solo en este navegador (localStorage). <b>Haz Exportar de vez en cuando</b> como copia de seguridad.</div>
-  <div>Reglas precargadas (jun 2026) como valores por defecto editables — <b>verifica siempre con tu firm</b>, cambian a menudo.</div>
-</footer>
-
 <div class="toast" id="toast"></div>
 
 <script>
 /* ============================================================
+   CONFIGURACIÓN DE SUPABASE (claves públicas, seguras en frontend)
+   ============================================================ */
+const SUPABASE_URL  = "https://zqucoaywmbaikntlhmhp.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_U__7woSWlqXezbhpY9_LXw_FWXe2r7z";
+
+/* ============================================================
    REGLAS POR FIRM Y PROGRAMA  (valores por defecto editables)
    Fuente: investigación oficial jun-2026 (FAQ/Help de cada firm).
-   inact = límite inactividad (días) · minDays = días mínimos req.
    ============================================================ */
 const FIRMS = {
   "The5ers": {
@@ -373,37 +425,162 @@ const FIRMS = {
   }
 };
 
-const STORE_KEY = "propfirm_accounts_v1";
+const STORE_KEY = "propfirm_accounts_v1";   // cache local / export
 let accounts = [];
 let filter = "all";
+let supa = null, currentUser = null, _shownUid = undefined;
 
 /* ---------- utilidades de fecha ---------- */
 function todayStr(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
-function parseD(s){ if(!s) return null; const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
+function parseD(s){ if(!s) return null; const [y,m,d]=String(s).slice(0,10).split("-").map(Number); return new Date(y,m-1,d); }
 function daysBetween(a,b){ return Math.floor((b-a)/86400000); }
 function fmtDate(s){ if(!s) return "—"; const d=parseD(s); return d.toLocaleDateString("es-ES",{day:"2-digit",month:"short",year:"numeric"}); }
 function money(n){ if(n===null||n===undefined||n==="") return "—"; const num=Number(n); return num.toLocaleString("es-ES",{maximumFractionDigits:0}); }
 function signMoney(n){ const num=Number(n); const s=Math.abs(num).toLocaleString("es-ES",{maximumFractionDigits:0}); return (num>0?"+":(num<0?"-":""))+s; }
+function genId(){ return "a"+Date.now()+Math.floor(Math.random()*1000); }
 
-/* ---------- persistencia ---------- */
-function load(){ try{ accounts = JSON.parse(localStorage.getItem(STORE_KEY)) || []; }catch(e){ accounts=[]; } }
-function save(){ localStorage.setItem(STORE_KEY, JSON.stringify(accounts)); }
+/* ---------- cache local (backup + export + offline) ---------- */
+function cache(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(accounts)); }catch(e){} }
+function loadCache(){ try{ return JSON.parse(localStorage.getItem(STORE_KEY))||[]; }catch(e){ return []; } }
 
-/* ---------- siembra inicial (solo la primera vez) ---------- */
-function seedIfFirstRun(){
-  if(localStorage.getItem(STORE_KEY)!==null) return;
+/* ============================================================
+   SUPABASE: auth + base de datos
+   ============================================================ */
+function configured(){ return !SUPABASE_URL.includes("__SUPABASE") && !!SUPABASE_ANON_KEY && !SUPABASE_ANON_KEY.includes("__SUPABASE"); }
+
+function initSupabase(){
+  if(!configured() || !window.supabase) return false;
+  supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  return true;
+}
+
+/* mapeo app <-> base de datos */
+function toRow(a){
+  return {
+    user_id: currentUser ? currentUser.id : undefined,
+    id:a.id, alias:a.alias, firm:a.firm||null, program:a.program||null, type:a.type||null,
+    status:a.status||null, size:a.size??null, platform:a.platform||null,
+    start_bal:a.startBal??null, cur_bal:a.curBal??null, target:a.target??null, cost:a.cost??null,
+    maxdd:a.maxdd||null, dll:a.dll||null, inact:a.inact??null,
+    last_traded:a.lastTraded||null, min_days:a.minDays??null, cycle_start:a.cycleStart||null,
+    days_done:a.daysDone??0, payout:a.payout||null, login:a.login||null, notes:a.notes||null
+  };
+}
+function fromRow(r){
+  return {
+    id:r.id, alias:r.alias||"", firm:r.firm||"", program:r.program||"", type:r.type||"Evaluación",
+    status:r.status||"", size:r.size, platform:r.platform||"",
+    startBal:r.start_bal, curBal:r.cur_bal, target:r.target, cost:r.cost,
+    maxdd:r.maxdd||"", dll:r.dll||"", inact:r.inact,
+    lastTraded:r.last_traded?String(r.last_traded).slice(0,10):"", minDays:r.min_days,
+    cycleStart:r.cycle_start?String(r.cycle_start).slice(0,10):"", daysDone:r.days_done||0,
+    payout:r.payout||"", login:r.login||"", notes:r.notes||"",
+    createdAt:r.created_at?String(r.created_at).slice(0,10):todayStr()
+  };
+}
+
+async function dbList(){
+  const {data,error}=await supa.from("accounts").select("*").order("created_at",{ascending:true});
+  if(error) throw error;
+  return data.map(fromRow);
+}
+async function dbUpsert(a){
+  const {error}=await supa.from("accounts").upsert(toRow(a),{onConflict:"user_id,id"});
+  if(error) throw error;
+}
+async function dbDelete(id){
+  const {error}=await supa.from("accounts").delete().eq("id",id);
+  if(error) throw error;
+}
+
+/* ---------- flujo de autenticación ---------- */
+async function bootAuth(){
+  if(!initSupabase()){ showConfigWarning(); return; }
+  supa.auth.onAuthStateChange((_e,session)=>handleAuth(session));
+  const {data:{session}} = await supa.auth.getSession();
+  handleAuth(session);
+}
+function handleAuth(session){
+  const uid = session && session.user ? session.user.id : null;
+  if(uid===_shownUid) return;            // sin cambios
+  _shownUid = uid;
+  if(uid){ currentUser=session.user; enterApp(); }
+  else { currentUser=null; showLogin(); }
+}
+function showLogin(){
+  document.getElementById('app').style.display='none';
+  document.getElementById('authScreen').style.display='flex';
+  document.getElementById('authLoading').style.display='none';
+  document.getElementById('loginForm').style.display='block';
+}
+function showConfigWarning(){
+  document.getElementById('authLoading').style.display='none';
+  document.getElementById('loginForm').style.display='none';
+  const w=document.getElementById('configWarn');
+  w.style.display='block';
+  w.innerHTML="⚙️ <b>Falta configurar Supabase.</b> Pega tu Project URL y anon key en las constantes <code>SUPABASE_URL</code> / <code>SUPABASE_ANON_KEY</code> al inicio del &lt;script&gt;.";
+}
+async function enterApp(){
+  document.getElementById('authScreen').style.display='none';
+  document.getElementById('app').style.display='block';
+  document.getElementById('userEmail').textContent=currentUser.email||"conectado";
+  buildFirmSelect();
+  await refresh();
+}
+
+async function doLogin(ev){
+  ev.preventDefault();
+  const email=document.getElementById('authEmail').value.trim();
+  const pass=document.getElementById('authPass').value;
+  const btn=document.getElementById('authBtn'); const err=document.getElementById('authErr');
+  err.style.color="var(--red)"; err.textContent=""; btn.disabled=true; btn.textContent="Entrando…";
+  const {error}=await supa.auth.signInWithPassword({email,password:pass});
+  btn.disabled=false; btn.textContent="Entrar";
+  if(error){ err.textContent = error.message==="Invalid login credentials" ? "Email o contraseña incorrectos." : error.message; }
+  return false;
+}
+async function doLogout(){ await supa.auth.signOut(); location.reload(); }
+async function forgotPassword(){
+  const email=document.getElementById('authEmail').value.trim();
+  const err=document.getElementById('authErr');
+  if(!email){ err.style.color="var(--red)"; err.textContent="Escribe tu email arriba primero."; return; }
+  const {error}=await supa.auth.resetPasswordForEmail(email,{redirectTo:location.origin});
+  err.style.color="var(--green)";
+  err.textContent = error ? error.message : "Te he enviado un enlace para restablecer la contraseña.";
+}
+
+/* ---------- carga / siembra / migración ---------- */
+async function refresh(){
+  try{
+    accounts = await dbList();
+  }catch(e){
+    toast("⚠️ Error cargando de la nube: "+e.message);
+    accounts = loadCache();
+    render(); return;
+  }
+  if(accounts.length===0) await seedOrMigrate();
+  cache(); render();
+}
+async function seedOrMigrate(){
+  const local = loadCache().filter(a=>a && a.alias);
+  if(local.length){
+    if(confirm(`Tienes ${local.length} cuenta(s) guardadas en este navegador. ¿Importarlas a la nube?`)){
+      for(const a of local){ if(!a.id) a.id=genId(); try{ await dbUpsert(a); }catch(e){} }
+      try{ accounts = await dbList(); }catch(e){}
+      return;
+    }
+  }
+  // siembra inicial: tus 4 firms
   const t=todayStr();
-  accounts = ["The5ers","WSFunded","Lucid Trading","Topstep"].map((f,i)=>{
+  const seeds = ["The5ers","WSFunded","Lucid Trading","Topstep"].map((f,i)=>{
     const fo=FIRMS[f];
-    return {
-      id:"seed"+i+"_"+f.replace(/\W/g,""), alias:f+" #1", firm:f, program:"", type:"Evaluación",
-      status:"✍️ Completar datos", size:null, platform:fo.platform,
-      startBal:null, curBal:null, target:null, cost:null, maxdd:"", dll:"",
-      inact:fo.seedInact, lastTraded:"", minDays:0, cycleStart:t, daysDone:0,
-      payout:"", login:"", notes:"Edita esta tarjeta y elige tu programa exacto para cargar las reglas.", createdAt:t
-    };
+    return { id:"seed"+i+"_"+f.replace(/\W/g,""), alias:f+" #1", firm:f, program:"", type:"Evaluación",
+      status:"✍️ Completar datos", size:null, platform:fo.platform, startBal:null, curBal:null, target:null,
+      cost:null, maxdd:"", dll:"", inact:fo.seedInact, lastTraded:"", minDays:0, cycleStart:t, daysDone:0,
+      payout:"", login:"", notes:"Edita esta tarjeta y elige tu programa exacto para cargar las reglas.", createdAt:t };
   });
-  save();
+  for(const a of seeds){ try{ await dbUpsert(a); }catch(e){} }
+  try{ accounts = await dbList(); }catch(e){ accounts = seeds; }
 }
 
 /* ---------- cálculos derivados ---------- */
@@ -412,7 +589,6 @@ function derive(a){
   const last = a.lastTraded ? parseD(a.lastTraded) : null;
   const daysSince = last ? daysBetween(last, today) : null;
   const profit = (a.curBal!==""&&a.curBal!=null&&a.startBal!==""&&a.startBal!=null) ? Number(a.curBal)-Number(a.startBal) : null;
-
   let risk = "none", remaining = null;
   if(a.inact && a.inact>0){
     const refDays = daysSince!==null ? daysSince : (a.createdAt ? daysBetween(parseD(a.createdAt), today) : 0);
@@ -431,7 +607,6 @@ function setFilter(el,f){
   el.classList.add('active');
   render();
 }
-
 function render(){ renderStats(); renderAlerts(); renderGrid(); }
 
 function renderStats(){
@@ -572,21 +747,22 @@ function card(a){
 
 function esc(s){ return (s==null?"":String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
-/* ---------- acciones de tarjeta ---------- */
-function markTraded(id){
+/* ---------- acciones de tarjeta (async, persisten en la nube) ---------- */
+async function markTraded(id){
   const a=accounts.find(x=>x.id===id); if(!a) return;
   const t=todayStr();
   if(a.lastTraded!==t){ a.daysDone=(Number(a.daysDone)||0)+1; }
   a.lastTraded=t;
-  save(); render();
+  try{ await dbUpsert(a); }catch(e){ toast("⚠️ No se pudo guardar: "+e.message); return; }
+  cache(); render();
   toast(`✓ "${a.alias}" marcada como operada hoy (${a.daysDone} día(s) este ciclo)`);
 }
-function resetCycle(id){
+async function resetCycle(id){
   const a=accounts.find(x=>x.id===id); if(!a) return;
-  if(confirm(`¿Reiniciar el contador de días mínimos de "${a.alias}"? (nuevo ciclo / tras payout)`)){
-    a.daysDone=0; a.cycleStart=todayStr();
-    save(); render(); toast("↺ Ciclo reiniciado (0 días)");
-  }
+  if(!confirm(`¿Reiniciar el contador de días mínimos de "${a.alias}"? (nuevo ciclo / tras payout)`)) return;
+  a.daysDone=0; a.cycleStart=todayStr();
+  try{ await dbUpsert(a); }catch(e){ toast("⚠️ "+e.message); return; }
+  cache(); render(); toast("↺ Ciclo reiniciado (0 días)");
 }
 
 /* ---------- modal ---------- */
@@ -613,36 +789,39 @@ function buildProgramSelect(firm, sel){
 function onFirmChange(){
   const firm=document.getElementById('f-firm').value;
   buildProgramSelect(firm);
-  applyPreset(); // aplica el primer programa de la firm
+  applyPreset();
 }
-
 function applyPreset(){
   const firm=document.getElementById('f-firm').value;
   const fo=FIRMS[firm]; if(!fo) return;
   const program=document.getElementById('f-program').value;
   const p=fo.programs[program]; if(!p) return;
-  const set=(id,v)=>{ if(v!=null && v!=="") document.getElementById(id).value=v; };
 
-  // estas reglas SE SOBREESCRIBEN al elegir programa (es una acción explícita)
   document.getElementById('f-type').value=p.type||"Evaluación";
   document.getElementById('f-inact').value=(p.inact!=null?p.inact:"");
   document.getElementById('f-minDays').value=(p.minDays!=null?p.minDays:"");
   document.getElementById('f-maxdd').value=p.maxdd||"";
   document.getElementById('f-dll').value=p.dll||"";
   document.getElementById('f-payout').value=p.payout||"";
-  // plataforma solo si está vacía
   const plat=document.getElementById('f-platform'); if(!plat.value) plat.value=fo.platform||"";
 
-  // preview de reglas
   const pv=document.getElementById('rulePreview');
   pv.classList.add('show');
   pv.innerHTML=`<b>${esc(firm)} · ${esc(program)}</b> <span style="color:var(--muted2)">(${esc(fo.kind)})</span><br>
-    ⏱️ ${esc(fo.inactNote)}<br>
-    📋 ${esc(p.note)}<br>
+    ⏱️ ${esc(fo.inactNote)}<br>📋 ${esc(p.note)}<br>
     <span class="hl">Inactividad:</span> ${p.inact?p.inact+'d':'sin límite'} ·
     <span class="hl">Días mín.:</span> ${p.minDays||0} ·
     <span class="hl">DD:</span> ${esc(p.maxdd)||'—'} ·
     <span class="hl">Daily:</span> ${esc(p.dll)||'—'}`;
+}
+function showPreviewOnly(firm,program){
+  const fo=FIRMS[firm]; const p=fo&&fo.programs[program];
+  const pv=document.getElementById('rulePreview');
+  if(!p){ pv.classList.remove('show'); return; }
+  pv.classList.add('show');
+  pv.innerHTML=`<b>${esc(firm)} · ${esc(program)}</b> <span style="color:var(--muted2)">(${esc(fo.kind)})</span><br>
+    ⏱️ ${esc(fo.inactNote)}<br>📋 ${esc(p.note)}<br>
+    <span style="color:var(--muted2)">Cambia el programa arriba para recargar estas reglas por defecto.</span>`;
 }
 
 function clearForm(){
@@ -659,7 +838,7 @@ function editAccount(id){
   document.getElementById('deleteBtn').style.display="inline-block";
   clearForm();
   buildFirmSelect(a.firm);
-  buildProgramSelect(a.firm, a.program); // fija el programa SIN disparar applyPreset (conserva tus datos)
+  buildProgramSelect(a.firm, a.program);
   const set=(id,v)=>document.getElementById(id).value=(v==null?"":v);
   set('f-id',a.id); set('f-alias',a.alias); set('f-status',a.status); set('f-size',a.size);
   set('f-platform',a.platform); set('f-startBal',a.startBal); set('f-curBal',a.curBal); set('f-target',a.target);
@@ -667,29 +846,19 @@ function editAccount(id){
   set('f-lastTraded',a.lastTraded); set('f-minDays',a.minDays); set('f-cycleStart',a.cycleStart);
   set('f-daysDone',a.daysDone); set('f-payout',a.payout); set('f-login',a.login); set('f-notes',a.notes);
   document.getElementById('f-type').value=a.type||"Evaluación";
-  // muestra el preview de las reglas del programa actual sin sobreescribir
   showPreviewOnly(a.firm,a.program);
   document.getElementById('overlay').classList.add('open');
-}
-function showPreviewOnly(firm,program){
-  const fo=FIRMS[firm]; const p=fo&&fo.programs[program];
-  const pv=document.getElementById('rulePreview');
-  if(!p){ pv.classList.remove('show'); return; }
-  pv.classList.add('show');
-  pv.innerHTML=`<b>${esc(firm)} · ${esc(program)}</b> <span style="color:var(--muted2)">(${esc(fo.kind)})</span><br>
-    ⏱️ ${esc(fo.inactNote)}<br>📋 ${esc(p.note)}<br>
-    <span style="color:var(--muted2)">Cambia el programa arriba para recargar estas reglas por defecto.</span>`;
 }
 
 function val(id){ const v=document.getElementById(id).value.trim(); return v===""?"":v; }
 function numVal(id){ const v=document.getElementById(id).value.trim(); return v===""?null:Number(v); }
 
-function saveAccount(){
+async function saveAccount(){
   const alias=val('f-alias');
   if(!alias){ toast("⚠️ Pon al menos un alias para la cuenta"); return; }
   const id=val('f-id');
   const data={
-    id: id || ("a"+Date.now()+Math.floor(Math.random()*1000)),
+    id: id || genId(),
     alias, firm:val('f-firm'), program:val('f-program'), type:val('f-type'), status:val('f-status'),
     size:numVal('f-size'), platform:val('f-platform'),
     startBal:numVal('f-startBal'), curBal:numVal('f-curBal'), target:numVal('f-target'), cost:numVal('f-cost'),
@@ -697,27 +866,23 @@ function saveAccount(){
     inact:numVal('f-inact'), lastTraded:val('f-lastTraded'),
     minDays:numVal('f-minDays'), cycleStart:val('f-cycleStart'), daysDone:numVal('f-daysDone')||0,
     payout:val('f-payout'), login:val('f-login'), notes:val('f-notes'),
+    createdAt: id ? (accounts.find(x=>x.id===id)||{}).createdAt || todayStr() : todayStr()
   };
-  if(id){
-    const i=accounts.findIndex(x=>x.id===id);
-    data.createdAt=accounts[i].createdAt||todayStr();
-    accounts[i]=data;
-  }else{
-    data.createdAt=todayStr();
-    accounts.push(data);
-  }
-  save(); closeModal(); render();
+  try{ await dbUpsert(data); }catch(e){ toast("⚠️ No se pudo guardar: "+e.message); return; }
+  const i=accounts.findIndex(x=>x.id===data.id);
+  if(i>=0) accounts[i]=data; else accounts.push(data);
+  cache(); closeModal(); render();
   toast(id?"✓ Cuenta actualizada":"✓ Cuenta añadida");
 }
 
-function deleteCurrent(){
+async function deleteCurrent(){
   const id=val('f-id'); if(!id) return;
   const a=accounts.find(x=>x.id===id);
-  if(confirm(`¿Eliminar la cuenta "${a?a.alias:''}"? No se puede deshacer.`)){
-    accounts=accounts.filter(x=>x.id!==id);
-    save(); closeModal(); render();
-    toast("🗑 Cuenta eliminada");
-  }
+  if(!confirm(`¿Eliminar la cuenta "${a?a.alias:''}"? No se puede deshacer.`)) return;
+  try{ await dbDelete(id); }catch(e){ toast("⚠️ "+e.message); return; }
+  accounts=accounts.filter(x=>x.id!==id);
+  cache(); closeModal(); render();
+  toast("🗑 Cuenta eliminada");
 }
 
 /* ---------- export / import ---------- */
@@ -729,18 +894,17 @@ function exportData(){
   URL.revokeObjectURL(url);
   toast("⭳ Copia exportada");
 }
-function importData(ev){
+async function importData(ev){
   const file=ev.target.files[0]; if(!file) return;
   const r=new FileReader();
-  r.onload=e=>{
+  r.onload=async e=>{
     try{
       const data=JSON.parse(e.target.result);
       if(!Array.isArray(data)) throw 0;
-      if(accounts.length && !confirm("¿Reemplazar las cuentas actuales por las del archivo? (Cancelar = fusionar)")){
-        const ids=new Set(accounts.map(a=>a.id));
-        data.forEach(d=>{ if(!ids.has(d.id)) accounts.push(d); });
-      } else { accounts=data; }
-      save(); render(); toast("⭱ Datos importados");
+      let n=0;
+      for(const d of data){ if(!d||!d.alias) continue; if(!d.id) d.id=genId(); try{ await dbUpsert(d); n++; }catch(err){} }
+      accounts=await dbList(); cache(); render();
+      toast(`⭱ ${n} cuenta(s) importadas a la nube`);
     }catch(err){ toast("⚠️ Archivo no válido"); }
   };
   r.readAsText(file);
@@ -757,10 +921,7 @@ document.getElementById('overlay').addEventListener('click',e=>{ if(e.target.id=
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
 
 /* init */
-seedIfFirstRun();
-load();
-buildFirmSelect();
-render();
+bootAuth();
 </script>
 </body>
 </html>
