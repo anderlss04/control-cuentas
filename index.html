@@ -141,6 +141,23 @@
     color:var(--txt);padding:11px 18px;border-radius:10px;font-size:.85rem;box-shadow:var(--shadow);opacity:0;transition:.3s;pointer-events:none;z-index:100;max-width:90vw;text-align:center}
   .toast.show{opacity:1}
 
+  /* ---- Diario de disciplina ---- */
+  .disc-panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:22px}
+  .disc-panel.disc-setup{font-size:.84rem;color:var(--muted);line-height:1.5}
+  .disc-panel.disc-setup code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:.92em}
+  .disc-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+  .disc-title{font-weight:700;font-size:.95rem;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .streak{font-size:.78rem;font-weight:700;color:var(--yellow);background:var(--yellow-bg);border:1px solid #5c4a14;border-radius:20px;padding:2px 10px}
+  .streak0{font-size:.76rem;font-weight:500;color:var(--muted2)}
+  .disc-strip{display:flex;gap:5px;flex-wrap:wrap}
+  .disc-day{width:34px;height:34px;border-radius:7px;border:1px solid var(--border);background:var(--panel2);color:var(--muted2);font-size:.66rem;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+  .disc-day.ok{background:var(--green-bg);border-color:#1f5128;color:var(--green)}
+  .disc-day.bad{background:var(--red-bg);border-color:#5a2226;color:var(--red)}
+  .disc-day.meh{background:var(--yellow-bg);border-color:#5c4a14;color:var(--yellow)}
+  .disc-day.none{opacity:.45}
+  .disc-day:hover{border-color:var(--accent)}
+  .disc-hint{font-size:.8rem;color:var(--muted);background:var(--panel2);border-radius:8px;padding:9px 11px;display:none}
+
   /* ---- Pantalla de login ---- */
   #authScreen{min-height:78vh;display:flex;align-items:center;justify-content:center;padding:20px}
   .auth-card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:30px 28px;max-width:380px;width:100%;box-shadow:var(--shadow)}
@@ -191,6 +208,7 @@
   </h1>
   <div class="toolbar">
     <button class="btn btn-primary" onclick="openModal()">＋ Añadir cuenta</button>
+    <button class="btn" onclick="openDisc()">📝 Disciplina hoy</button>
     <button class="btn btn-ghost btn-sm" onclick="exportData()">⭳ Exportar</button>
     <button class="btn btn-ghost btn-sm" onclick="document.getElementById('importFile').click()">⭱ Importar</button>
     <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importData(event)">
@@ -201,6 +219,7 @@
 
 <div class="stats" id="stats"></div>
 <div class="alerts" id="alerts"></div>
+<div id="discPanel"></div>
 
 <div class="filterbar" id="filterbar">
   <span style="color:var(--muted)">Filtrar:</span>
@@ -327,6 +346,16 @@
         <input id="f-daysDone" type="number" placeholder="0">
       </div>
 
+      <div class="section-label">Mis reglas (disciplina)</div>
+      <div class="field">
+        <label>Mi máx. de trades/día <span class="hint">(anti-overtrading)</span></label>
+        <input id="f-maxTradesDay" type="number" placeholder="Ej: 3">
+      </div>
+      <div class="field">
+        <label>Mi riesgo máx/día <span class="hint">($ que me impongo)</span></label>
+        <input id="f-riskPerDay" type="number" placeholder="Ej: 300">
+      </div>
+
       <div class="section-label">Extras</div>
       <div class="field">
         <label>Info de payout</label>
@@ -346,6 +375,54 @@
       <span style="flex:1"></span>
       <button class="btn" onclick="closeModal()">Cancelar</button>
       <button class="btn btn-primary" onclick="saveAccount()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Disciplina -->
+<div class="overlay" id="discOverlay">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-head">
+      <h2 id="discTitle">Registrar disciplina</h2>
+      <button class="close-x" onclick="closeDisc()">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="d-id">
+      <div class="field">
+        <label>Fecha</label>
+        <input id="d-date" type="date">
+      </div>
+      <div class="field">
+        <label>Cuenta <span class="hint">(opcional)</span></label>
+        <select id="d-account" onchange="discAccountHint()"></select>
+      </div>
+      <div class="field">
+        <label>Nº de trades hoy</label>
+        <input id="d-trades" type="number" placeholder="0" oninput="discAccountHint()">
+      </div>
+      <div class="field">
+        <label>P&amp;L del día <span class="hint">($)</span></label>
+        <input id="d-pnl" type="number" placeholder="0">
+      </div>
+      <div class="field full">
+        <label>¿Seguí mi plan hoy?</label>
+        <select id="d-followed">
+          <option value="">—</option>
+          <option value="si">✅ Sí, respeté mis reglas</option>
+          <option value="no">❌ No, me salté el plan</option>
+        </select>
+      </div>
+      <div class="field full">
+        <label>Nota / estado de ánimo</label>
+        <input id="d-note" placeholder="Ej: tranquilo, sin revenge; o: forcé entradas por aburrimiento">
+      </div>
+      <div class="disc-hint" id="discHint"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-danger" id="discDeleteBtn" onclick="deleteDisc()" style="display:none">🗑 Borrar día</button>
+      <span style="flex:1"></span>
+      <button class="btn" onclick="closeDisc()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveDisc()">Guardar</button>
     </div>
   </div>
 </div>
@@ -429,6 +506,8 @@ const STORE_KEY = "propfirm_accounts_v1";   // cache local / export
 let accounts = [];
 let filter = "all";
 let supa = null, currentUser = null, _shownUid = undefined;
+let discipline = [];                              // diario de disciplina
+let hasRiskCols = false, hasDiscipline = false;   // detección de esquema (migración aplicada o no)
 
 /* ---------- utilidades de fecha ---------- */
 function todayStr(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
@@ -456,7 +535,7 @@ function initSupabase(){
 
 /* mapeo app <-> base de datos */
 function toRow(a){
-  return {
+  const row = {
     user_id: currentUser ? currentUser.id : undefined,
     id:a.id, alias:a.alias, firm:a.firm||null, program:a.program||null, type:a.type||null,
     status:a.status||null, size:a.size??null, platform:a.platform||null,
@@ -465,6 +544,8 @@ function toRow(a){
     last_traded:a.lastTraded||null, min_days:a.minDays??null, cycle_start:a.cycleStart||null,
     days_done:a.daysDone??0, payout:a.payout||null, login:a.login||null, notes:a.notes||null
   };
+  if(hasRiskCols){ row.max_trades_day=a.maxTradesDay??null; row.risk_per_day=a.riskPerDay??null; }
+  return row;
 }
 function fromRow(r){
   return {
@@ -475,6 +556,7 @@ function fromRow(r){
     lastTraded:r.last_traded?String(r.last_traded).slice(0,10):"", minDays:r.min_days,
     cycleStart:r.cycle_start?String(r.cycle_start).slice(0,10):"", daysDone:r.days_done||0,
     payout:r.payout||"", login:r.login||"", notes:r.notes||"",
+    maxTradesDay:r.max_trades_day, riskPerDay:r.risk_per_day,
     createdAt:r.created_at?String(r.created_at).slice(0,10):todayStr()
   };
 }
@@ -525,7 +607,13 @@ async function enterApp(){
   document.getElementById('app').style.display='block';
   document.getElementById('userEmail').textContent=currentUser.email||"conectado";
   buildFirmSelect();
+  await detectSchema();
   await refresh();
+  await loadDiscipline();
+}
+async function detectSchema(){
+  try{ const {error}=await supa.from('accounts').select('max_trades_day').limit(1); hasRiskCols=!error; }catch(e){ hasRiskCols=false; }
+  try{ const {error}=await supa.from('discipline_log').select('id').limit(1); hasDiscipline=!error; }catch(e){ hasDiscipline=false; }
 }
 
 async function doLogin(ev){
@@ -607,7 +695,7 @@ function setFilter(el,f){
   el.classList.add('active');
   render();
 }
-function render(){ renderStats(); renderAlerts(); renderGrid(); }
+function render(){ renderStats(); renderAlerts(); renderGrid(); renderDiscipline(); }
 
 function renderStats(){
   let totalProfit=0, withProfit=0, inRisk=0, totalCost=0;
@@ -728,6 +816,8 @@ function card(a){
 
     ${inactBox}
 
+    ${(a.maxTradesDay||a.riskPerDay)?`<div class="kv"><div style="grid-column:1/-1"><div class="k">Mi plan (disciplina)</div><div class="v" style="font-size:.76rem">${a.maxTradesDay?'máx '+a.maxTradesDay+' trades/día':''}${a.maxTradesDay&&a.riskPerDay?' · ':''}${a.riskPerDay?'riesgo máx '+money(a.riskPerDay)+'/día':''}</div></div></div>`:''}
+
     <div class="kv">
       <div><div class="k">Última operación</div><div class="v">${fmtDate(a.lastTraded)}</div></div>
       <div><div class="k">Max DD / Pérdida diaria</div><div class="v" style="font-size:.76rem">${esc(a.maxdd)||"—"}${a.dll?" · "+esc(a.dll):""}</div></div>
@@ -826,7 +916,7 @@ function showPreviewOnly(firm,program){
 
 function clearForm(){
   ["f-id","f-alias","f-status","f-size","f-platform","f-startBal","f-curBal","f-target","f-cost",
-   "f-maxdd","f-dll","f-inact","f-lastTraded","f-minDays","f-cycleStart","f-daysDone","f-payout","f-login","f-notes"]
+   "f-maxdd","f-dll","f-inact","f-lastTraded","f-minDays","f-cycleStart","f-daysDone","f-maxTradesDay","f-riskPerDay","f-payout","f-login","f-notes"]
    .forEach(id=>document.getElementById(id).value="");
   document.getElementById('f-type').value="Evaluación";
   document.getElementById('rulePreview').classList.remove('show');
@@ -844,7 +934,8 @@ function editAccount(id){
   set('f-platform',a.platform); set('f-startBal',a.startBal); set('f-curBal',a.curBal); set('f-target',a.target);
   set('f-cost',a.cost); set('f-maxdd',a.maxdd); set('f-dll',a.dll); set('f-inact',a.inact);
   set('f-lastTraded',a.lastTraded); set('f-minDays',a.minDays); set('f-cycleStart',a.cycleStart);
-  set('f-daysDone',a.daysDone); set('f-payout',a.payout); set('f-login',a.login); set('f-notes',a.notes);
+  set('f-daysDone',a.daysDone); set('f-maxTradesDay',a.maxTradesDay); set('f-riskPerDay',a.riskPerDay);
+  set('f-payout',a.payout); set('f-login',a.login); set('f-notes',a.notes);
   document.getElementById('f-type').value=a.type||"Evaluación";
   showPreviewOnly(a.firm,a.program);
   document.getElementById('overlay').classList.add('open');
@@ -865,6 +956,7 @@ async function saveAccount(){
     maxdd:val('f-maxdd'), dll:val('f-dll'),
     inact:numVal('f-inact'), lastTraded:val('f-lastTraded'),
     minDays:numVal('f-minDays'), cycleStart:val('f-cycleStart'), daysDone:numVal('f-daysDone')||0,
+    maxTradesDay:numVal('f-maxTradesDay'), riskPerDay:numVal('f-riskPerDay'),
     payout:val('f-payout'), login:val('f-login'), notes:val('f-notes'),
     createdAt: id ? (accounts.find(x=>x.id===id)||{}).createdAt || todayStr() : todayStr()
   };
@@ -918,7 +1010,103 @@ function toast(msg){
 }
 
 document.getElementById('overlay').addEventListener('click',e=>{ if(e.target.id==='overlay') closeModal(); });
-document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
+document.getElementById('discOverlay').addEventListener('click',e=>{ if(e.target.id==='discOverlay') closeDisc(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeModal(); closeDisc(); } });
+
+/* ============================================================
+   DIARIO DE DISCIPLINA (anti-overtrading)
+   ============================================================ */
+function ymd(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function fromDiscRow(r){ return { id:r.id, date:r.date?String(r.date).slice(0,10):"", accountId:r.account_id||"", accountAlias:r.account_alias||"", trades:r.trades, pnl:r.pnl, followed:r.followed, note:r.note||"" }; }
+function toDiscRow(e){ return { user_id:currentUser?currentUser.id:undefined, id:e.id, date:e.date, account_id:e.accountId||null, account_alias:e.accountAlias||null, trades:e.trades??null, pnl:e.pnl??null, followed:(e.followed===true||e.followed===false)?e.followed:null, note:e.note||null }; }
+async function discUpsert(e){ const {error}=await supa.from("discipline_log").upsert(toDiscRow(e),{onConflict:"user_id,id"}); if(error) throw error; }
+async function discDelete(id){ const {error}=await supa.from("discipline_log").delete().eq("id",id); if(error) throw error; }
+
+async function loadDiscipline(){
+  if(!hasDiscipline){ discipline=[]; renderDiscipline(); return; }
+  try{ const {data,error}=await supa.from("discipline_log").select("*").order("date",{ascending:false}); if(error) throw error; discipline=data.map(fromDiscRow); }
+  catch(e){ discipline=[]; }
+  renderDiscipline();
+}
+function discByDate(){ const m={}; discipline.forEach(e=>{ if(e.date) m[e.date]=e; }); return m; }
+function discStreak(){
+  const m=discByDate(); let s=0; const d=parseD(todayStr());
+  if(!m[todayStr()]) d.setDate(d.getDate()-1);
+  while(true){ const e=m[ymd(d)]; if(e && e.followed===true){ s++; d.setDate(d.getDate()-1); } else break; }
+  return s;
+}
+function renderDiscipline(){
+  const el=document.getElementById('discPanel'); if(!el) return;
+  if(!hasDiscipline){
+    el.innerHTML=`<div class="disc-panel disc-setup">🎯 <b>Diario de disciplina</b> — ejecuta una vez la migración <code>supabase-migration-disciplina.sql</code> en Supabase (SQL Editor → Run) y recarga la página para activarlo.</div>`;
+    return;
+  }
+  const m=discByDate(), streak=discStreak(), today=todayStr(), todayE=m[today];
+  let strip="";
+  for(let i=13;i>=0;i--){
+    const d=parseD(today); d.setDate(d.getDate()-i); const key=ymd(d); const e=m[key];
+    const cls= e? (e.followed===true?'ok':(e.followed===false?'bad':'meh')) : 'none';
+    const tip= e? `${key} · ${e.trades!=null?e.trades+' trades':'—'} · ${e.pnl!=null?signMoney(e.pnl):'—'} · ${e.followed===true?'✓ plan':(e.followed===false?'✗ plan':'sin marcar')}` : key+' · sin registro';
+    strip+=`<button class="disc-day ${cls}" title="${esc(tip)}" onclick="openDisc('${key}')">${String(d.getDate()).padStart(2,'0')}</button>`;
+  }
+  el.innerHTML=`<div class="disc-panel">
+    <div class="disc-head">
+      <div class="disc-title">🎯 Disciplina ${streak>0?`<span class="streak">🔥 ${streak} día(s) en plan</span>`:`<span class="streak0">sin racha — registra hoy</span>`}</div>
+      <button class="btn btn-sm ${todayE?'':'btn-primary'}" onclick="openDisc()">${todayE?'✎ Editar hoy':'📝 Registrar hoy'}</button>
+    </div>
+    <div class="disc-strip">${strip}</div>
+  </div>`;
+}
+function buildDiscAccounts(sel){
+  const opts=['<option value="">— General —</option>'].concat(accounts.map(a=>`<option value="${a.id}" ${a.id===sel?'selected':''}>${esc(a.alias)}</option>`));
+  document.getElementById('d-account').innerHTML=opts.join("");
+}
+function discAccountHint(){
+  const a=accounts.find(x=>x.id===document.getElementById('d-account').value);
+  const h=document.getElementById('discHint');
+  if(a && a.maxTradesDay){
+    const trades=Number(document.getElementById('d-trades').value)||0;
+    const over=trades>Number(a.maxTradesDay);
+    h.innerHTML=`Tu plan en <b>${esc(a.alias)}</b>: máx <b>${a.maxTradesDay}</b> trades/día${a.riskPerDay?` · riesgo máx ${money(a.riskPerDay)}`:''}. ${trades?(over?`<span style="color:var(--red)">Hoy llevas ${trades} → te pasaste.</span>`:`<span style="color:var(--green)">Hoy ${trades} → dentro del plan.</span>`):''}`;
+    h.style.display='block';
+  } else { h.style.display='none'; h.innerHTML=""; }
+}
+function numD(id){ const v=document.getElementById(id).value.trim(); return v===""?null:Number(v); }
+function openDisc(dateStr){
+  if(!hasDiscipline){ toast("⚠️ Ejecuta la migración SQL para activar el diario de disciplina"); return; }
+  const date=dateStr||todayStr(), id="disc_"+date;
+  const e=discipline.find(x=>x.id===id);
+  buildDiscAccounts(e?e.accountId:"");
+  document.getElementById('d-id').value=id;
+  document.getElementById('d-date').value=date;
+  document.getElementById('d-trades').value=e&&e.trades!=null?e.trades:"";
+  document.getElementById('d-pnl').value=e&&e.pnl!=null?e.pnl:"";
+  document.getElementById('d-followed').value=e?(e.followed===true?'si':(e.followed===false?'no':'')):"";
+  document.getElementById('d-note').value=e?e.note:"";
+  document.getElementById('discDeleteBtn').style.display=e?'inline-block':'none';
+  document.getElementById('discTitle').textContent=e?('Disciplina · '+fmtDate(date)):'Registrar disciplina';
+  discAccountHint();
+  document.getElementById('discOverlay').classList.add('open');
+}
+function closeDisc(){ document.getElementById('discOverlay').classList.remove('open'); }
+async function saveDisc(){
+  const date=document.getElementById('d-date').value || todayStr(), id="disc_"+date;
+  const aid=document.getElementById('d-account').value;
+  const fv=document.getElementById('d-followed').value;
+  const e={ id, date, accountId:aid, accountAlias:(accounts.find(x=>x.id===aid)||{}).alias||"",
+    trades:numD('d-trades'), pnl:numD('d-pnl'), followed: fv==='si'?true:(fv==='no'?false:null),
+    note:document.getElementById('d-note').value.trim() };
+  try{ await discUpsert(e); }catch(err){ toast("⚠️ "+err.message); return; }
+  const i=discipline.findIndex(x=>x.id===id); if(i>=0) discipline[i]=e; else discipline.push(e);
+  closeDisc(); renderDiscipline(); toast("✓ Día guardado");
+}
+async function deleteDisc(){
+  const id=document.getElementById('d-id').value; if(!id) return;
+  if(!confirm("¿Borrar el registro de este día?")) return;
+  try{ await discDelete(id); }catch(err){ toast("⚠️ "+err.message); return; }
+  discipline=discipline.filter(x=>x.id!==id);
+  closeDisc(); renderDiscipline(); toast("🗑 Día borrado");
+}
 
 /* init */
 bootAuth();
